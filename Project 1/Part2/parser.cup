@@ -1,0 +1,92 @@
+/* ---- Package and import specifications ---- */
+import java_cup.runtime.*;
+
+/* ---- User code components ---- */
+parser code {:
+  // Connecting the parser to a scanner
+  Scanner s;
+  Parser(Scanner s){ this.s = s; }
+:}
+
+scan with {: return s.next_token(); :};
+
+/* ---- Symbol (terminal & non-terminal) lists ---- */
+
+/* Terminal Symbols */
+terminal IF, ELSE, PREFIX, REVERSE, PLUS, LPAR, RPAR, COMMA, BEGIN, END;
+terminal String IDENT, STRING_LITERAL;
+
+/* Non-Terminal Symbols */
+non terminal program, declarationList, declaration, functionCall, statementList;
+non terminal argumentList, word, restArguments, statement, plusList, ifstatement;
+non terminal condition, fullword, main, maxword, restParameters, parameterList;
+
+/* ---- Precedence Declarations ---- */
+
+/* precedence(if) < precedence(concat) < precedence(REVERSE) */
+precedence left LPAR, RPAR;
+
+/* ---- The Grammar ---- */
+program ::= declarationList:e                                                    {: System.out.println("\nimport java.util.*;\n\npublic class Main {\n" + e + "\n}"); :};
+
+declarationList ::= declaration:e1 declarationList:e2                            {: RESULT = e1 + "\n" + e2; :}
+                  | main:e                                                       {: RESULT = "public static void main(String[] args) {\n" + e + "}\n"; :}
+                  ;
+
+declaration ::= IDENT:e1 LPAR parameterList:e2 BEGIN statementList:e3 END        {: RESULT = "public static String " + e1 + "(" + e2 + "{\n" + e3 + "}\n"; :};
+
+main ::= functionCall:e1 main:e2                                                 {: RESULT = "System.out.println(" + e1 + ");\n" + e2 + "\n"; :}
+       | /* do nothing */                                                        {: RESULT = ""; :}
+       ;
+
+functionCall ::= IDENT:e1 LPAR argumentList:e2                                   {: RESULT = e1 + "(" + e2; :};
+
+parameterList ::= statement: e1 restParameters:e2                                {: RESULT = "String "+ e1 + "" + e2; :}
+                | RPAR                                                           {: RESULT = ")"; :}
+                ;
+
+restParameters ::= COMMA statement:e1 restParameters:e2                          {: RESULT = "," + " String " + e1 + e2; :}
+                 | RPAR                                                          {: RESULT = ")"; :}
+                 ;
+
+
+argumentList ::= statement:e1 restArguments:e2                                   {: RESULT = e1 + "" + e2; :}
+               | RPAR                                                            {: RESULT = ")"; :}
+               ;
+
+restArguments ::= COMMA statement:e1 restArguments:e2                            {: RESULT = "," + e1 + e2; :}
+                | RPAR                                                           {: RESULT = ")"; :}
+                ;
+
+statementList ::= statement:e1 statementList:e2                                  {: RESULT = "return " + e1 + "\n" + e2 + ";"; :}
+                | /* do nothing */                                               {: RESULT = ""; :}
+                ;
+
+statement ::= word:e                                                             {: RESULT = e; :}
+            | functionCall:f                                                     {: RESULT = f; :}
+            | ifstatement:e                                                      {: RESULT = e; :}
+            | fullword:e1 PLUS plusList:e2                                       {: RESULT = e1 + "+" + e2; :}
+            | REVERSE statement:e                                                {: RESULT = "new StringBuilder(" + e + ").reverse().toString()"; :}
+            ;
+
+plusList ::= fullword:e1 PLUS plusList:e2                                        {: RESULT = e1 + "+" + e2; :}
+           | fullword:e                                                          {: RESULT = e; :}
+           ;
+
+word ::= STRING_LITERAL:e                                                        {: RESULT = "\"" + e + "\""; :}
+       | IDENT:e                                                                 {: RESULT = e; :}
+       ;
+
+fullword ::= word:e                                                              {: RESULT = e; :}
+           | functionCall:f                                                      {: RESULT = f; :}
+           ;
+
+ifstatement ::= IF LPAR condition:e1 RPAR statement:e2 ELSE statement:e3         {: RESULT = "(" + e1 + ")" + "?" + e2 + ":" + e3 + ""; :};
+
+condition ::= statement:e                                                        {: RESULT = e; :}
+            | statement:e1 PREFIX statement:e2                                       {: RESULT = e1 + ".startsWith(" + e2 + ")"; :}
+            ;
+
+maxword ::= fullword:e                                                           {: RESULT = e; :}
+          | fullword:e1 PLUS plusList:e2                                         {: RESULT = e1 + "+" + e2; :}
+          ;
