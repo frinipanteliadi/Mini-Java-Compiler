@@ -1,0 +1,31 @@
+class Main {
+	public static void main (String[] args) {
+		int a;
+		a = 10;
+		System.out.println(a);
+	}
+}
+
+class A {
+	int a1;
+	C obj;
+	boolean a2;	
+	public int foo() {
+		A a;
+		a = this;
+		System.out.println(a2);
+		return 0;
+	}
+}
+
+class B extends A {
+	int b;
+	
+	public int foo() {
+		return b;
+	}
+}
+
+class C {
+	boolean[] c;
+}

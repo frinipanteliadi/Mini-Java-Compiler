@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="Compilers - Project 2">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/out/production/Compilers - Project 2/javacc5.jar!/" />
+      <root url="jar://$PROJECT_DIR$/out/production/Compilers - Project 2/jtb132di.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

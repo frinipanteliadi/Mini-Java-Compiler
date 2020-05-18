@@ -1,0 +1,20 @@
+class Main {
+	public static void main(String[] args) {
+		A obj;
+		obj = new C();
+	}
+}
+
+class A {
+	A obj;
+}
+
+class B extends A {
+}
+
+class C extends B {
+	public int foo() {
+		obj = new C();
+		return 0;
+	}
+}

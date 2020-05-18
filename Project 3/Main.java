@@ -30,6 +30,10 @@ class Main {
             //System.out.println("After MethodChecker: ");
             //symbolTable.printSymbolTable();
 
+            /* Creating the V-Tables */
+            VTables vtables = new VTables();
+            vtables.createVTables(symbolTable);
+
             StatementChecker statementChecker = new StatementChecker(symbolTable);
             root.accept(statementChecker, null);
 
