@@ -14,6 +14,7 @@ class Main {
 
         try{
             fis = new FileInputStream(args[0]);
+
             MiniJavaParser parser = new MiniJavaParser(fis);
             System.err.println("Program parsed successfully.");
             Goal root = parser.Goal();
@@ -29,6 +30,11 @@ class Main {
             root.accept(methodChecker, null);
             //System.out.println("After MethodChecker: ");
             //symbolTable.printSymbolTable();
+
+            /* Creating the .ll file */
+            String fileName = "./" + args[0] + ".ll";
+            FileOutputStream out = new FileOutputStream(fileName);
+            System.out.println("Created the file: " + fileName);
 
             /* Creating the V-Tables */
             VTables vtables = new VTables();

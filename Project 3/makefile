@@ -6,4 +6,4 @@ compile:
 	javac Main.java
 
 clean:
-	rm -rf *.class *~
+	rm -rf *.class *~ *.ll
