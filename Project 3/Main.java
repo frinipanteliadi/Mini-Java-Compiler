@@ -32,13 +32,13 @@ class Main {
             //symbolTable.printSymbolTable();
 
             /* Creating the .ll file */
-            String fileName = "./" + args[0] + ".ll";
-            FileOutputStream out = new FileOutputStream(fileName);
-            System.out.println("Created the file: " + fileName);
-
-            /* Creating the V-Tables */
-            VTables vtables = new VTables();
-            vtables.createVTables(symbolTable);
+//            String fileName = "./" + args[0] + ".ll";
+//            FileOutputStream out = new FileOutputStream(fileName);
+//            System.out.println("Created the file: " + fileName);
+//
+//            /* Creating the V-Tables */
+//            VTables vtables = new VTables();
+//            vtables.createVTables(symbolTable);
 
             StatementChecker statementChecker = new StatementChecker(symbolTable);
             root.accept(statementChecker, null);

@@ -8,24 +8,19 @@ class Main {
 
 class A {
 	int a1;
-	C obj;
-	boolean a2;	
-	public int foo() {
-		A a;
-		a = this;
-		System.out.println(a2);
-		return 0;
-	}
+	boolean[] a2;
+	public int foo(int a3) { return a3; }
 }
 
 class B extends A {
-	int b;
-	
-	public int foo() {
-		return b;
-	}
+	A parent;
+	int[] b1;
+	public boolean bar() { return true; }
 }
 
-class C {
-	boolean[] c;
+class C extends B {
+	boolean c1;
+	public int foo(int c2) { c2 = 0; return c2; }
+	public boolean bla() { return false; }
+	public boolean bar() { boolean var; var = true; return var; }
 }

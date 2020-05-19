@@ -52,10 +52,7 @@ public class SymbolTable {
     }
 
     // Create a new mapping for the class named "className"
-    public void putClass(String className, int offset, ClassInfo parent) {
-
-        classMap.put(className, new ClassInfo(className, offset, parent));
-    }
+    public void putClass(String className, int offset, ClassInfo parent) { classMap.put(className, new ClassInfo(className, offset, parent)); }
 
     public ClassInfo getClass(String className) {
         if(classes.contains(className))
@@ -140,80 +137,90 @@ public class SymbolTable {
     }
 
     public void setOffsets() {
-        ClassInfo currentClass = null;
-        FieldInfo currentField = null;
-        MethodInfo currentMethod = null;
+
+        ClassInfo currentClass;
+        FieldInfo currentField;
+        MethodInfo currentMethod;
+        ClassInfo offsetClass = null;
+        ClassInfo parent;
+        int increment;
+        int offset = 0;
+        int flag;
 
         // Calculating the offsets for every class
         for(int i = 0; i < classes.size(); i++) {
-           currentClass = getClass(classes.get(i));
+
+            currentClass = getClass(classes.get(i));
 
            // Calculating the offsets for the fields
            for(int j = 0; j < currentClass.getFields().size(); j++) {
-                currentField = currentClass.getFields().get(j);
+
+               currentField = currentClass.getFields().get(j);
+               offsetClass = currentClass;
+               parent = currentClass.getParent();
+
+               while(parent != null) {
+                   offsetClass = parent;
+                   parent = parent.getParent();
+               }
 
                 if(currentField.getType().equals("int")) {
-
-                    if(currentClass.hasParent()) {
-                        currentField.setOffset(currentClass.getParent().getFieldOffset());
-                        currentClass.getParent().incFieldOffset(4);
-                    }
-                    else {
-                        currentField.setOffset(currentClass.getFieldOffset());
-                        currentClass.incFieldOffset(4);
-                    }
+                    increment = 4;
                 }
                 else if(currentField.getType().equals("boolean")) {
-
-                    if(currentClass.hasParent()) {
-                        currentField.setOffset(currentClass.getParent().getFieldOffset());
-                        currentClass.getParent().incFieldOffset(1);
-                    }
-                    else {
-                        currentField.setOffset(currentClass.getFieldOffset());
-                        currentClass.incFieldOffset(1);
-                    }
+                    increment = 1;
                 }
                 else if(currentField.getType().equals("int[]") || currentField.getType().equals("boolean[]")) {
-
-                    if(currentClass.hasParent()) {
-                        currentField.setOffset(currentClass.getParent().getFieldOffset());
-                        currentClass.getParent().incFieldOffset(8);
-                    }
-                    else {
-                        currentField.setOffset(currentClass.getFieldOffset());
-                        currentClass.incFieldOffset(8);
-                    }
+                    increment = 8;
                 }
                 else {
-                    if(currentClass.hasParent()) {
-                        currentField.setOffset(currentClass.getParent().getFieldOffset());
-                        currentClass.getParent().incFieldOffset(8);
-                    }
-                    else {
-                        currentField.setOffset(currentClass.getFieldOffset());
-                        currentClass.incFieldOffset(8);
-                    }
+                    increment = 8;
                 }
+
+               currentField.setOffset(offsetClass.getFieldOffset());
+               offsetClass.incFieldOffset(increment);
            }
 
             // Calculating the offsets for the methods and the pointers
             for(int j = 0; j < currentClass.getMethods().size(); j++) {
-                currentMethod = currentClass.getClassMethod(currentClass.getMethods().get(j));
 
+                currentMethod = currentClass.getClassMethod(currentClass.getMethods().get(j));
                 String methodName = currentMethod.getName();
 
-                if(currentMethod.getOwner().hasParent()) {
-                    if(!currentMethod.getOwner().getParent().getMethods().contains(methodName)) {
-                       currentMethod.setOffset(currentMethod.getOwner().getParent().getPointerOffset());
-                       currentMethod.getOwner().getParent().incPointerOffset(8);
+                flag = 0;
+                parent = currentMethod.getOwner().getParent();
+
+                while(parent != null) {
+
+                    if(parent.getMethods().contains(methodName)) {
+                        // The method was found in one of its superclasses
+                        flag = 1;
+                        offset = parent.getClassMethod(methodName).getOffset();
+                        break;
                     }
-                    else
-                        currentMethod.setOffset(-1);
+                    else {
+                        flag = 2;
+                        offsetClass = parent;
+                        parent = parent.getParent();
+                    }
                 }
-                else {
-                    currentMethod.setOffset(currentMethod.getOwner().getPointerOffset());
-                    currentMethod.getOwner().incPointerOffset(8);
+
+                switch (flag) {
+                    case 0:
+                        // The class doesn't extend any other classes
+                        currentMethod.setOffset(currentMethod.getOwner().getPointerOffset());
+                        currentMethod.getOwner().incPointerOffset(8);
+                        break;
+                    case 1:
+                        // This is an overridden method
+                        currentMethod.setOffset(/*-1*/offset);
+                        currentMethod.getOwner().incPointerOffset(8);
+                        break;
+                    case 2:
+                        // None of the super classes had the method
+                        currentMethod.setOffset(offsetClass.getPointerOffset());
+                        offsetClass.incPointerOffset(8);
+                        break;
                 }
             }
         }
