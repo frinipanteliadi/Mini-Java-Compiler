@@ -6,6 +6,7 @@ public class ClassInfo extends Info {
 
     private List<FieldInfo> fields;
     private List<String> methods;
+    private List<String> inheritedMethods;
     private HashMap<String, MethodInfo> methodMap;
     private int fieldOffset;
     private int pointerOffset;
@@ -18,6 +19,7 @@ public class ClassInfo extends Info {
 
         fields = new ArrayList<FieldInfo>();
         methods = new ArrayList<String>();
+        inheritedMethods = new ArrayList<String>();
         methodMap = new HashMap<String, MethodInfo>();
         fieldOffset = 0;
         pointerOffset = 0;
@@ -85,6 +87,8 @@ public class ClassInfo extends Info {
     public List<String> getMethods() {
         return methods;
     }
+
+    public List<String> getInheritedMethods() { return inheritedMethods; }
 
     public List<FieldInfo> getFields() {
         return fields;

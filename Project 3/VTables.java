@@ -1,4 +1,6 @@
 import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Stack;
 import java.util.LinkedHashMap;
@@ -40,6 +42,7 @@ public class VTables {
         ClassInfo currentClass;
         String className;
         String s;
+        List<String> inheritedMethods;
 
         stackOfClasses = new Stack<ClassInfo>();
 
@@ -62,7 +65,6 @@ public class VTables {
                 s = "@." + className + "_vtable = global[";
 
 
-                
 
 
                 byte b[] = s.getBytes(); // Converting the string to a byte array

@@ -70,9 +70,6 @@ public class MethodInfo extends Info {
         return nameExists;
     }
 
-    // Adds a new item to the list of statement
-    //public void addStatement(StatementInfo statement) { statements.add(statement); }
-
     public boolean checkVariableType(String typeToCheck, String varName) {
         boolean flag = false;
 
