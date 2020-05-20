@@ -4,12 +4,11 @@ public class ClassTables {
 
     String className;
     LinkedHashMap<String, Integer> fieldsTable;
-    LinkedHashMap<String, Integer> methodsTable;
+    LinkedHashMap<String, Integer> pointersTable;
 
     public ClassTables(String className) {
         this.className = className;
-        fieldsTable = new LinkedHashMap<String,Integer>();
-        methodsTable = new LinkedHashMap<String,Integer>();
+        fieldsTable = new LinkedHashMap<String, Integer>();
+        pointersTable = new LinkedHashMap<String, Integer>();
     }
-    
 }

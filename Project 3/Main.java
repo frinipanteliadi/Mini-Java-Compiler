@@ -32,13 +32,9 @@ class Main {
             //symbolTable.printSymbolTable();
 
             /* Creating the .ll file */
-//            String fileName = "./" + args[0] + ".ll";
-//            FileOutputStream out = new FileOutputStream(fileName);
-//            System.out.println("Created the file: " + fileName);
-//
-//            /* Creating the V-Tables */
-//            VTables vtables = new VTables();
-//            vtables.createVTables(symbolTable);
+            String fileName = "./" + args[0] + ".ll";
+            FileOutputStream out = new FileOutputStream(fileName);
+            //System.out.println("Created the file: " + fileName);
 
             StatementChecker statementChecker = new StatementChecker(symbolTable);
             root.accept(statementChecker, null);
@@ -48,12 +44,19 @@ class Main {
             //System.out.println("After StatementChecker: ");
             symbolTable.printSymbolTable();
 
+            /* Creating the V-Tables */
+            VTables vtables = new VTables(symbolTable);
+            vtables.writeTables(out);
+
             //System.out.println(root.accept(eval, null));
         }
         catch(ParseException ex){
             System.out.println(ex.getMessage());
         }
         catch(FileNotFoundException ex){
+            System.err.println(ex.getMessage());
+        }
+        catch (Exception ex){
             System.err.println(ex.getMessage());
         }
         finally{

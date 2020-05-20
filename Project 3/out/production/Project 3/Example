@@ -12,6 +12,11 @@ class A {
 	public int foo(int a3) { return a3; }
 }
 
+class D {
+	A obj;
+	public int foo(int a) { a = 2; return a; }
+}
+
 class B extends A {
 	A parent;
 	int[] b1;
