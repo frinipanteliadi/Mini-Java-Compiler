@@ -173,6 +173,19 @@ public class ClassInfo extends Info {
                 currentMethod.printMethod(currentMethod.getName());
             }
         }
+
+        System.out.print("  - Inherited Methods:");
+
+        if(inheritedMethods.size() == 0)
+            System.out.println(" NONE");
+        else {
+            System.out.println();
+            for(int i = 0; i < inheritedMethods.size(); i++) {
+                MethodInfo currentMethod = inheritedMethodMap.get(inheritedMethods.get(i));
+                System.out.print("    * Name: " + currentMethod.getName() + ", Return Type: " + currentMethod.getReturnType() + " (Offset: " + currentMethod.getOffset() + ")");
+                System.out.println(" (Owner: Class " + currentMethod.getOwner().getName() + ")");
+            }
+        }
     }
 
     public void printClassInfo() {

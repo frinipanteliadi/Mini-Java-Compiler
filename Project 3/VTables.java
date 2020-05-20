@@ -18,7 +18,17 @@ public class VTables {
 
     public void putVTables() {
         for(int i = 0; i < symbolTable.getClasses().size(); i++)
-            tablesMap.put(symbolTable.getClasses().get(i), new ClassTables(symbolTable.getClasses().get(i)));
+            tablesMap.put(symbolTable.getClasses().get(i), new ClassTables(symbolTable.getClasses().get(i), symbolTable));
+    }
+
+    public void createClassTables() {
+        for(int i = 0; i < symbolTable.getClasses().size(); i++)
+            tablesMap.get(symbolTable.getClasses().get(i)).createPointersTable();
+    }
+
+    public void printClassTables() {
+        for(int i = 0; i < symbolTable.getClasses().size(); i++)
+            tablesMap.get(symbolTable.getClasses().get(i)).printPointersTable();
     }
 
     public void pushParent(ClassInfo currentClass, Stack<ClassInfo> stackOfClasses) {
@@ -43,6 +53,7 @@ public class VTables {
         String className;
         String s;
         List<String> inheritedMethods;
+        int totalMethods;
 
         stackOfClasses = new Stack<ClassInfo>();
 
@@ -59,15 +70,28 @@ public class VTables {
         while(!stackOfClasses.isEmpty()) {
             currentClass = stackOfClasses.pop();
             className = currentClass.getName();
-            //System.out.println("Popped: " + className);
 
             try {
-                s = "@." + className + "_vtable = global[";
+
+                if(currentClass.getMethods().contains("main")) {
+                    totalMethods = 0;
+                    s = "@." + className + "_vtable = global[" + totalMethods + " x i8*] []\n\n";
+                }
+                else {
+                    totalMethods = currentClass.getInheritedMethods().size() + currentClass.getMethods().size();
+                    s = "@." + className + "_vtable = global[" + totalMethods + " x i8*] [\n";
+                    s += "    i8* bitcast(\n";
+
+
+                }
 
                 byte b[] = s.getBytes(); // Converting the string to a byte array
                 out.write(b);
             }
-            catch (Exception e) { System.out.println(e); System.exit(1); }
+            catch (Exception e) {
+                System.out.println(e);
+                System.exit(1);
+            }
         }
     }
 }

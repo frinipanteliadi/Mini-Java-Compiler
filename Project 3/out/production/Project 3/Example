@@ -21,8 +21,8 @@ class D {
 class B extends A {
 	A parent;
 	int[] b1;
-	public int foo(int val) { val = 2; return val; }
 	public boolean bla() { return true; }
+	public int foo(int val) { val = 2; return val; }
 }
 
 class C extends B {

@@ -42,13 +42,17 @@ class Main {
 
             symbolTable.setOffsets();
             symbolTable.setInheritedMethods();
-            symbolTable.printInheritedMethods();
+            //symbolTable.printInheritedMethods();
 
             //System.out.println("After StatementChecker: ");
             symbolTable.printSymbolTable();
 
+
             /* Creating the V-Tables */
             VTables vtables = new VTables(symbolTable);
+            //System.out.println("\n");
+            vtables.createClassTables();
+            //vtables.printClassTables();
             vtables.writeTables(out);
 
             //System.out.println(root.accept(eval, null));
