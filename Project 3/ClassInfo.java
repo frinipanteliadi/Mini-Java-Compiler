@@ -1,5 +1,6 @@
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Stack;
 import java.util.List;
 
 public class ClassInfo extends Info {
@@ -7,6 +8,7 @@ public class ClassInfo extends Info {
     private List<FieldInfo> fields;
     private List<String> methods;
     private List<String> inheritedMethods;
+    private HashMap<String, MethodInfo> inheritedMethodMap;
     private HashMap<String, MethodInfo> methodMap;
     private int fieldOffset;
     private int pointerOffset;
@@ -21,6 +23,7 @@ public class ClassInfo extends Info {
         methods = new ArrayList<String>();
         inheritedMethods = new ArrayList<String>();
         methodMap = new HashMap<String, MethodInfo>();
+        inheritedMethodMap = new HashMap<String, MethodInfo>();
         fieldOffset = 0;
         pointerOffset = 0;
         this.parent = parent;
@@ -88,7 +91,49 @@ public class ClassInfo extends Info {
         return methods;
     }
 
+    public HashMap<String, MethodInfo> getMethodMap() { return methodMap; }
+
+    public HashMap<String, MethodInfo> getInheritedMethodMap() { return inheritedMethodMap; }
+
     public List<String> getInheritedMethods() { return inheritedMethods; }
+
+    public void setInheritedMethods() {
+
+        Stack<ClassInfo> stackOfClasses = new Stack<ClassInfo>();
+        ClassInfo currentParent = parent;
+        String methodName;
+        MethodInfo currentMethod;
+
+        while(currentParent != null) {
+            stackOfClasses.push(currentParent);
+            currentParent = currentParent.getParent();
+        }
+
+        if(!stackOfClasses.isEmpty()) {
+            while(!stackOfClasses.isEmpty()) {
+
+                currentParent = stackOfClasses.pop();
+
+                for(int i = 0; i < currentParent.getMethods().size(); i++) {
+                    methodName = currentParent.getMethods().get(i);
+                    currentMethod = currentParent.getClassMethod(methodName);
+
+                    if(!methods.contains(methodName)) {
+
+                        if(inheritedMethods.contains(methodName)) {
+                            inheritedMethodMap.remove(methodName);
+                            inheritedMethodMap.put(methodName, currentMethod);
+                        }
+
+                        else {
+                            inheritedMethods.add(methodName);
+                            inheritedMethodMap.put(methodName, currentMethod);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     public List<FieldInfo> getFields() {
         return fields;
@@ -126,7 +171,6 @@ public class ClassInfo extends Info {
             for (int i = 0; i < methods.size(); i++) {
                 MethodInfo currentMethod = methodMap.get(methods.get(i));
                 currentMethod.printMethod(currentMethod.getName());
-                //System.out.println("    * Name: " + currentMethod.getName() + ", Return Type: " + currentMethod.getReturnType());
             }
         }
     }

@@ -59,13 +59,10 @@ public class VTables {
         while(!stackOfClasses.isEmpty()) {
             currentClass = stackOfClasses.pop();
             className = currentClass.getName();
-            System.out.println("Popped: " + className);
+            //System.out.println("Popped: " + className);
 
             try {
                 s = "@." + className + "_vtable = global[";
-
-
-
 
                 byte b[] = s.getBytes(); // Converting the string to a byte array
                 out.write(b);

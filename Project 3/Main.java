@@ -3,6 +3,7 @@ import visitor.*;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
 
 class Main {
     public static void main (String [] args){
@@ -40,6 +41,8 @@ class Main {
             root.accept(statementChecker, null);
 
             symbolTable.setOffsets();
+            symbolTable.setInheritedMethods();
+            symbolTable.printInheritedMethods();
 
             //System.out.println("After StatementChecker: ");
             symbolTable.printSymbolTable();

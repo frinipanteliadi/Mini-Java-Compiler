@@ -225,5 +225,36 @@ public class SymbolTable {
             }
         }
     }
+
+    public void setInheritedMethods() {
+
+        for(int i = 0; i < classes.size(); i++)
+            classMap.get(classes.get(i)).setInheritedMethods();
+    }
+
+    public void printInheritedMethods() {
+        for(int i = 0; i < getClasses().size(); i++) {
+
+            String className = getClasses().get(i);
+            ClassInfo currentClass = getClass(className);
+            String methodName;
+            MethodInfo currentMethod;
+            HashMap<String, MethodInfo> map;
+
+            System.out.println("Inherited methods of class " + className);
+
+            if(currentClass.getInheritedMethods().isEmpty())
+                System.out.println("   * NONE");
+            else {
+                map = currentClass.getInheritedMethodMap();
+                for(int j = 0; j < currentClass.getInheritedMethods().size(); j++) {
+                    methodName = currentClass.getInheritedMethods().get(j);
+                    currentMethod = map.get(methodName);
+                    System.out.println("    * " + methodName + " (Owner: " + currentMethod.getOwner().getName() + ")");
+                }
+            }
+        }
+        System.out.println();
+    }
 }
 
