@@ -18,6 +18,8 @@ class D {
 	public int foo(int a) { a = 2; return a; }
 }
 
+class E {}
+
 class B extends A {
 	A parent;
 	int[] b1;

@@ -1,9 +1,5 @@
 import java.io.FileOutputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.HashMap;
-import java.util.Stack;
-import java.util.LinkedHashMap;
+import java.util.*;
 
 public class VTables {
 
@@ -46,14 +42,38 @@ public class VTables {
 
     }
 
+    public String returnType(String type) {
+        String retType;
+
+        switch (type) {
+            case "int":
+                retType = "i32";
+                break;
+            case "boolean":
+                retType = "i8";
+                break;
+            default:
+                retType = "i8*";
+        }
+
+        return retType;
+    }
+
+    // Writes the V-Table declarations to an .ll file
     public void writeTables(FileOutputStream out) throws Exception{
 
+        String s;
+        String className;
+        String methodName;
+        String returnType;
+        String argType;
+        int totalMethods;
+        int totalArgs;
+        int argIndex;
         Stack<ClassInfo> stackOfClasses; // Keeps track of the correct sequence for the v-tables
         ClassInfo currentClass;
-        String className;
-        String s;
-        List<String> inheritedMethods;
-        int totalMethods;
+        MethodInfo currentMethod = null;
+        FieldInfo currentArgument;
 
         stackOfClasses = new Stack<ClassInfo>();
 
@@ -68,22 +88,84 @@ public class VTables {
         }
 
         while(!stackOfClasses.isEmpty()) {
+
             currentClass = stackOfClasses.pop();
             className = currentClass.getName();
 
             try {
 
                 if(currentClass.getMethods().contains("main")) {
-                    totalMethods = 0;
-                    s = "@." + className + "_vtable = global[" + totalMethods + " x i8*] []\n\n";
+                    s = "@." + className + "_vtable = global[0 x i8*] []\n\n";
+                    byte b[] = s.getBytes(); // Converting the string to a byte array
+                    out.write(b);
+                    continue;
                 }
+
                 else {
                     totalMethods = currentClass.getInheritedMethods().size() + currentClass.getMethods().size();
-                    s = "@." + className + "_vtable = global[" + totalMethods + " x i8*] [\n";
-                    s += "    i8* bitcast(\n";
+                    s = "@." + className + "_vtable = global[" + totalMethods + " x i8*] [";
 
+                    if(totalMethods != 0) {
+                        s += "\n";
 
+                        Set<String> keys = tablesMap.get(className).getPointersTable().keySet();
+                        int index = keys.size();
+                        int counter = 0;
+
+                        // Iterating through the class's methods
+                        for(String k:keys) {
+
+                            // Retrieving the method that we'll be working on
+                            methodName = k;
+                            if(currentClass.getInheritedMethods().contains(methodName))
+                                currentMethod = currentClass.getInheritedMethodMap().get(methodName);
+                            else if(currentClass.getMethods().contains(methodName))
+                                currentMethod = currentClass.getMethodMap().get(methodName);
+
+                            // Setting the return type
+                            returnType = currentMethod.getReturnType();
+                            returnType = returnType(returnType);
+
+                            s += "    i8* bitcast (" + returnType + " (i8*";
+
+                            // Iterating through the method's arguments
+                            totalArgs = currentMethod.getArguments().size();
+                            argIndex = 0;
+                            for(int i = 0; i < totalArgs; i++) {
+
+                                s += ",";
+
+                                currentArgument = currentMethod.getArguments().get(i);
+                                argType = currentArgument.getType();
+                                argType = returnType(argType);
+
+                                s += argType;
+
+                                if(argIndex < totalArgs - 1)
+                                    s += ",";
+
+                                argIndex++;
+                            }
+
+                            s += ")* @" + className + "." + methodName + " to i8*)";
+
+                            if(counter < index - 1)
+                                s += ",\n";
+
+                            counter++;
+                        }
+                    }
+                    else {
+                        s += "]\n\n";
+                        byte b[] = s.getBytes(); // Converting the string to a byte array
+                        out.write(b);
+                        continue;
+                    }
+
+                    s += "\n";
                 }
+
+                s += "]\n\n";
 
                 byte b[] = s.getBytes(); // Converting the string to a byte array
                 out.write(b);

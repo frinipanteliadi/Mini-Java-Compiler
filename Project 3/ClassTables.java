@@ -4,15 +4,19 @@ public class ClassTables {
 
     private String className;
     private SymbolTable symbolTable;
+    private ClassInfo owner;
     private LinkedHashMap<String, Integer> fieldsTable;
     private LinkedHashMap<String, Integer> pointersTable;
 
     public ClassTables(String className, SymbolTable symbolTable) {
         this.className = className;
         this.symbolTable = symbolTable;
+        this.owner = symbolTable.getClass(className);
         fieldsTable = new LinkedHashMap<String, Integer>();
         pointersTable = new LinkedHashMap<String, Integer>();
     }
+
+    public ClassInfo getOwner() { return this.owner; }
 
     public void sortList(List<Pair> list) {
         Pair temp;
@@ -81,6 +85,8 @@ public class ClassTables {
             System.out.println("    [" + pointersTable.get(k) + "]: " + k);
         System.out.println();
     }
+
+    public LinkedHashMap<String, Integer> getPointersTable() { return this.pointersTable; }
 }
 
 class Pair {
