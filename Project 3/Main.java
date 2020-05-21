@@ -46,7 +46,7 @@ class Main {
             //System.out.println("\n");
             vtables.createClassTables();
             //vtables.printClassTables();
-            vtables.writeTables(out);
+            vtables.writeVTables(out);
 
             //System.out.println(root.accept(eval, null));
         }

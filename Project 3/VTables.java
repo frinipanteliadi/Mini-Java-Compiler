@@ -60,7 +60,7 @@ public class VTables {
     }
 
     // Writes the V-Table declarations to an .ll file
-    public void writeTables(FileOutputStream out) throws Exception{
+    public void writeVTables(FileOutputStream out) throws Exception{
 
         String s;
         String className;
