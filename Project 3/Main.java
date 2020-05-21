@@ -24,18 +24,13 @@ class Main {
             ClassChecker classChecker = new ClassChecker(symbolTable);
             root.accept(classChecker, null);
             symbolTable.checkDataTypes();
-            //System.out.println("After ClassChecker: ");
-            //symbolTable.printSymbolTable();
 
             MethodChecker methodChecker = new MethodChecker(symbolTable);
             root.accept(methodChecker, null);
-            //System.out.println("After MethodChecker: ");
-            //symbolTable.printSymbolTable();
 
             /* Creating the .ll file */
             String fileName = "./" + args[0] + ".ll";
             FileOutputStream out = new FileOutputStream(fileName);
-            //System.out.println("Created the file: " + fileName);
 
             StatementChecker statementChecker = new StatementChecker(symbolTable);
             root.accept(statementChecker, null);
@@ -44,9 +39,7 @@ class Main {
             symbolTable.setInheritedMethods();
             //symbolTable.printInheritedMethods();
 
-            //System.out.println("After StatementChecker: ");
             symbolTable.printSymbolTable();
-
 
             /* Creating the V-Tables */
             VTables vtables = new VTables(symbolTable);
