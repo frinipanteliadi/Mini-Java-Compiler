@@ -29,7 +29,9 @@ class Main {
             root.accept(methodChecker, null);
 
             /* Creating the .ll file */
-            String fileName = "./" + args[0] + ".ll";
+            String[] arrOfStr = args[0].split(".java", 2);
+            String fileName = "./" + arrOfStr[0] + ".ll";
+            System.out.println("Filename: " + fileName);
             FileOutputStream out = new FileOutputStream(fileName);
 
             StatementChecker statementChecker = new StatementChecker(symbolTable);
@@ -43,10 +45,12 @@ class Main {
 
             /* Creating the V-Tables */
             VTables vtables = new VTables(symbolTable);
-            //System.out.println("\n");
             vtables.createClassTables();
             //vtables.printClassTables();
             vtables.writeVTables(out);
+
+            Functions.declareFunctions(out);
+
 
             //System.out.println(root.accept(eval, null));
         }
