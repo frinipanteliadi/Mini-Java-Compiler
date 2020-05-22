@@ -1,6 +1,6 @@
 import java.util.*;
 
-public class ClassTables {
+public class ClassTables extends Info{
 
     private String className;
     private SymbolTable symbolTable;
@@ -9,6 +9,7 @@ public class ClassTables {
     private LinkedHashMap<String, Integer> pointersTable;
 
     public ClassTables(String className, SymbolTable symbolTable) {
+        super(null, -1);
         this.className = className;
         this.symbolTable = symbolTable;
         this.owner = symbolTable.getClass(className);

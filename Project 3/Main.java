@@ -44,13 +44,16 @@ class Main {
             symbolTable.printSymbolTable();
 
             /* Creating the V-Tables */
-            VTables vtables = new VTables(symbolTable);
+            VTables vtables = new VTables(symbolTable, out);
             vtables.createClassTables();
             //vtables.printClassTables();
-            vtables.writeVTables(out);
+            vtables.writeVTables(/*out*/);
 
             Functions.declareFunctions(out);
 
+            /* Creating the visitor responsible for the translation */
+            Translator translator = new Translator(vtables);
+            root.accept(translator, null);
 
             //System.out.println(root.accept(eval, null));
         }

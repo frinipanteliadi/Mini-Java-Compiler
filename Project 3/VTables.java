@@ -1,16 +1,22 @@
+import java.io.File;
 import java.io.FileOutputStream;
 import java.util.*;
 
-public class VTables {
+public class VTables extends Info {
 
     private HashMap<String, ClassTables> tablesMap;
     private SymbolTable symbolTable;
+    private FileOutputStream out;
 
-    public VTables(SymbolTable symbolTable) {
+    public VTables(SymbolTable symbolTable, FileOutputStream out) {
+        super(null, -1);
         tablesMap = new HashMap<String, ClassTables>();
         this.symbolTable = symbolTable;
+        this.out = out;
         putVTables();
     }
+
+    public FileOutputStream getOutFile() { return this.out; }
 
     public void putVTables() {
         for(int i = 0; i < symbolTable.getClasses().size(); i++)
@@ -63,7 +69,7 @@ public class VTables {
     }
 
     // Writes the V-Table declarations to an .ll file
-    public void writeVTables(FileOutputStream out) throws Exception{
+    public void writeVTables(/*FileOutputStream out*/) throws Exception{
 
         String s;
         String className;
@@ -216,7 +222,7 @@ class Functions {
         s += "\tcall void @exit(i32 1)\n";
         s += "\tret void\n";
         s += "}\n\n";
-        
+
         try {
             byte b[] = s.getBytes(); // Converting the string to a byte array
             out.write(b);
