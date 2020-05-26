@@ -180,6 +180,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         if(expression.getType().equals("newExpr")) {
             System.out.println("Expr: " + expression.getType());
+            writeOutput(identifier.getRegName() + "\n\n");
             return null;
         }
 
@@ -254,24 +255,36 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         System.out.println("AllocationExpression starts");
 
-        int size = 0;
+        int size;
+        int pointersTableSize;
         FieldInfo identifier;
-        String className;
-        String registerName;
+        String[] registerName;
         ClassInfo newClass;
 
+        registerName = new String[3];
         identifier = (FieldInfo) n.f1.accept(this, null);
         newClass = symbolTable.getClass(identifier.getName());
         System.out.println("Identifier: " + newClass.getName());
 
         size = (newClass.getObjectSize()) + 8;
-        System.out.println("Size: " + size);
-        registerName = "%_" + registers;
-        writeOutput("\t" + registerName + " = call i8* @calloc(i32 1, i32 " + size + ")\n\n");
-        System.out.println("Just wrote: " + registerName + " = call i8* @calloc(i32 1, i32 " + size + ")");
+        registerName[0] = "%_" + registers;
         registers++;
+        writeOutput("\t" + registerName[0] + " = call i8* @calloc(i32 1, i32 " + size + ")\n\n");
 
-        System.out.println("AllocationExpression ends");
+        registerName[1] = "%_" + registers;
+        registers++;
+        writeOutput("\t" + registerName[1] + " = bitcast i8* " + registerName[0] + " to i8***\n\n");
+
+        pointersTableSize = vTables.getClassTables(identifier.getName()).getPointersTable().size();
+        registerName[2] = "%_" + registers;
+        registers++;
+        writeOutput("\t" + registerName[2] + " = getelementptr [" + pointersTableSize + " x i8*], [");
+        writeOutput(pointersTableSize + " x i8*]* " + vTables.getClassTables(identifier.getName()).getVTableName());
+        writeOutput(", i32 0, i32 0\n\n");
+
+        writeOutput("\tstore i8** " + registerName[2] + ", i8*** " + registerName[1] + "\n\n");
+        writeOutput("\tstore i8* " + registerName[0] + ", i8** ");
+
         return (new FieldInfo("newExpr", identifier.getName(), -1, false));
     }
 

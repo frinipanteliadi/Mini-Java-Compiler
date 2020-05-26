@@ -16,6 +16,8 @@ public class VTables extends Info {
         putVTables();
     }
 
+    public ClassTables getClassTables(String className) { return tablesMap.get(className); }
+
     public SymbolTable getSymbolTable() { return this.symbolTable; }
 
     public FileOutputStream getOutFile() { return this.out; }

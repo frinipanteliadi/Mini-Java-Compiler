@@ -3,6 +3,7 @@ import java.util.*;
 public class ClassTables extends Info{
 
     private String className;
+    private String vTableName;
     private SymbolTable symbolTable;
     private ClassInfo owner;
     private LinkedHashMap<String, Integer> fieldsTable;
@@ -11,6 +12,7 @@ public class ClassTables extends Info{
     public ClassTables(String className, SymbolTable symbolTable) {
         super(null, -1);
         this.className = className;
+        this.vTableName = "@." + this.className + "_vtable";
         this.symbolTable = symbolTable;
         this.owner = symbolTable.getClass(className);
         fieldsTable = new LinkedHashMap<String, Integer>();
@@ -18,6 +20,8 @@ public class ClassTables extends Info{
     }
 
     public ClassInfo getOwner() { return this.owner; }
+
+    public String getVTableName() { return this.vTableName; }
 
     public void sortList(List<Pair> list) {
         Pair temp;
