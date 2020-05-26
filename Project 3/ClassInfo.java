@@ -29,6 +29,41 @@ public class ClassInfo extends Info {
         this.parent = parent;
     }
 
+    // Returns the size of an object of ClassInfo
+    public int getObjectSize() {
+        int classSize = 0;
+        FieldInfo currentField;
+        ClassInfo currentParent;
+
+        for(int i = 0; i < fields.size(); i++) {
+            currentField = fields.get(i);
+
+            if(currentField.getType().equals("int"))
+                classSize += 4;
+            else if(currentField.getType().equals("boolean"))
+                classSize += 1;
+            else
+                classSize += 8;
+        }
+
+        currentParent = parent;
+        while(currentParent != null) {
+            for(int i = 0; i < currentParent.getFields().size(); i++) {
+                currentField = currentParent.getFields().get(i);
+
+                if(currentField.getType().equals("int"))
+                    classSize += 4;
+                else if(currentField.getType().equals("boolean"))
+                    classSize += 1;
+                else
+                    classSize += 8;
+            }
+            currentParent = currentParent.getParent();
+        }
+
+        return classSize;
+    }
+
     public boolean fieldNameExists(String fieldName) {
         boolean exists = false;
         for(int i = 0; i < fields.size(); i++) {
@@ -193,5 +228,16 @@ public class ClassInfo extends Info {
             System.out.println("  - Parent Class: " + parent.getName());
         else
             System.out.println("  - Parent Class: NONE");
+    }
+
+    public void setRegisters() {
+
+        // Setting the register names for the fields of the class
+        for(int i = 0; i < fields.size(); i++)
+            fields.get(i).setRegName(this.getName() + "_" + fields.get(i).getName());
+
+        // Setting the register names for the local variables
+        for(int i = 0; i < methods.size(); i++)
+            methodMap.get(methods.get(i)).setRegisters();
     }
 }

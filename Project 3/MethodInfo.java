@@ -7,7 +7,6 @@ public class MethodInfo extends Info {
     private List<FieldInfo> arguments;
     private List<FieldInfo> variables;
     private ClassInfo owner; // The class that owns the method
-    //private List<StatementInfo> statements;
 
     // Constructor
     public MethodInfo (String returnType, String methodName,  int offset, ClassInfo owner) {
@@ -205,5 +204,26 @@ public class MethodInfo extends Info {
             }
         }
         return flag;
+    }
+
+    public boolean isArgument(FieldInfo var) {
+
+        String varName;
+        FieldInfo currentArg;
+
+        varName = var.getName();
+
+        for(int i = 0; i < arguments.size(); i++) {
+            currentArg = arguments.get(i);
+            if(currentArg.getName().equals(varName))
+                return true;
+        }
+
+        return false;
+    }
+
+    public void setRegisters() {
+        for(int i = 0; i < variables.size(); i++)
+            variables.get(i).setRegName(owner.getName() + "_" + this.getName() + "_" + variables.get(i).getName());
     }
 }

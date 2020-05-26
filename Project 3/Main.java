@@ -51,6 +51,8 @@ class Main {
 
             Functions.declareFunctions(out);
 
+            symbolTable.setRegisterNames();
+
             /* Creating the visitor responsible for the translation */
             Translator translator = new Translator(vtables);
             root.accept(translator, null);

@@ -39,8 +39,11 @@ public class MethodChecker extends GJDepthFirst<String, Info> {
 
         MethodInfo currentMethod = symbolTable.getClass(className).getClassMethod("main");
 
-        // Adding the name of the argument to the list
+        // Adding the name of the argument to the list of the methods variables
         currentMethod.addVariable("String[]", parameterName, 0, true);
+
+        // Adding the name of the argument to the list of the method's arguments
+        currentMethod.addParameter("String[]", parameterName, 0, true);
 
         if(n.f14.present())
             n.f14.accept(this, currentMethod);

@@ -256,5 +256,10 @@ public class SymbolTable {
         }
         System.out.println();
     }
+
+    public void setRegisterNames() {
+        for(int i = 0; i < classes.size(); i++)
+            classMap.get(classes.get(i)).setRegisters();
+    }
 }
 

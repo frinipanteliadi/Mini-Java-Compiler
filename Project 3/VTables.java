@@ -16,6 +16,8 @@ public class VTables extends Info {
         putVTables();
     }
 
+    public SymbolTable getSymbolTable() { return this.symbolTable; }
+
     public FileOutputStream getOutFile() { return this.out; }
 
     public void putVTables() {
@@ -48,7 +50,7 @@ public class VTables extends Info {
 
     }
 
-    public String returnType(String type) {
+    public String setType(String type) {
         String retType;
 
         switch (type) {
@@ -69,7 +71,7 @@ public class VTables extends Info {
     }
 
     // Writes the V-Table declarations to an .ll file
-    public void writeVTables(/*FileOutputStream out*/) throws Exception{
+    public void writeVTables() {
 
         String s;
         String className;
@@ -133,7 +135,7 @@ public class VTables extends Info {
 
                             // Setting the return type
                             returnType = currentMethod.getReturnType();
-                            returnType = returnType(returnType);
+                            returnType = setType(returnType);
 
                             s += "    i8* bitcast (" + returnType + " (i8*";
 
@@ -146,7 +148,7 @@ public class VTables extends Info {
 
                                 currentArgument = currentMethod.getArguments().get(i);
                                 argType = currentArgument.getType();
-                                argType = returnType(argType);
+                                argType = setType(argType);
 
                                 s += argType;
 
@@ -192,7 +194,7 @@ public class VTables extends Info {
 
 class Functions {
 
-    public static void declareFunctions(FileOutputStream out) throws Exception{
+    public static void declareFunctions(FileOutputStream out) {
 
         String s;
         s = "declare i8* @calloc(i32, i32)\n";
