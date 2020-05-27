@@ -2,7 +2,8 @@ import syntaxtree.*;
 import visitor.GJDepthFirst;
 
 import java.io.FileOutputStream;
-import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Translator extends GJDepthFirst<Info, Info> {
 
@@ -13,6 +14,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
     private SymbolTable symbolTable;
     private MethodInfo currentMethod;
     private FieldInfo currentVariable;
+    private List<FieldInfo> methodArguments;
 
     // Constructor
     public Translator(VTables vTables) {
@@ -24,6 +26,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         symbolTable = vTables.getSymbolTable();
         currentMethod = null;
         currentVariable = null;
+        methodArguments = new ArrayList<FieldInfo>();
     }
 
     // Writes a string to the .ll file
@@ -109,9 +112,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | PrintStatement()
      */
     public Info visit(Statement n, Info argu) {
-        System.out.println("Statement Starts");
+        //System.out.println("Statement Starts");
         FieldInfo statement = (FieldInfo)n.f0.accept(this, null);
-        System.out.println("Statement ends");
+        //System.out.println("Statement ends");
         return statement;
         //return null;
     }
@@ -125,7 +128,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(PrintStatement n, Info argu) {
 
-        System.out.println("PrintStatement starts");
+        //System.out.println("PrintStatement starts");
 
         FieldInfo expression;
         String registerName;
@@ -150,8 +153,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
             registers++;
         }
+        else if(expression.getType().equals("messageSend")) {
+            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n\n");
+        }
 
-        System.out.println("PrintStatement ends");
+        //System.out.println("PrintStatement ends");
         return /*null*/expression;
     }
 
@@ -163,39 +169,62 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(AssignmentStatement n, Info argu) {
 
-        System.out.println("AssignmentStatement starts");
+        //System.out.println("AssignmentStatement starts");
 
+        String arg1 = null;
+        String arg2 = null;
+        String type1 = null;
+        String type2 = null;
         FieldInfo identifier;
         FieldInfo expression;
 
-        identifier = (FieldInfo)n.f0.accept(this, null); // Changing the currentVariable field
+        identifier = (FieldInfo)n.f0.accept(this, null);
+        expression = (FieldInfo)n.f2.accept(this, null);
 
-        // Case 1: The identifier is a local variable of the method
+        // ** Locating the identifier **
         if(currentMethod.variableNameExists(identifier.getName()))
+            // Case 1: Local variable of the method
             identifier = currentMethod.getCertainVariable(identifier.getName());
+        else if(currentMethod.getOwner().fieldNameExists(identifier.getName()))
+            // Case 2: Field of the owning class
+            identifier = currentMethod.getOwner().getCertainField(identifier.getName());
+        else if(currentMethod.getOwner().inheritedField(identifier.getName()))
+            // Case 3: Field of a super class
+            identifier = currentMethod.getOwner().getInheritedField(identifier.getName());
 
+        type2 = vTables.setType(identifier.getType()) + "*";
+        arg2 = identifier.getRegName();
 
-        // In the field called 'name' we (might) have stored a value
-        expression = (FieldInfo) n.f2.accept(this, null);
+        // ** Locating the identifier **
+        if(expression.getType().equals("identifier")) {
+            // Case 1: Local variable of the method
+            if(currentMethod.variableNameExists(expression.getName()))
+                expression = currentMethod.getCertainVariable(expression.getName());
+            // Case 2: Field of the owning class
+            else if(currentMethod.getOwner().fieldNameExists(expression.getName()))
+                expression = currentMethod.getOwner().getCertainField(expression.getName());
+            // Case 3: Field of a super class
+            else if(currentMethod.getOwner().inheritedField(expression.getName()))
+                expression = currentMethod.getOwner().getInheritedField(expression.getName());
 
-        if(expression.getType().equals("newExpr")) {
-            System.out.println("Expr: " + expression.getType());
+            type1 = vTables.setType(expression.getType());
+            arg1 = "%_" + registers;
+            registers++;
+
+            writeOutput("\t" + arg1 + " = load " + type1 + ", " + type1 + "* " + expression.getRegName() + "\n\n");
+        }
+        else if(expression.getType().equals("int")) {
+            type1 = "i32";
+            arg1 = expression.getName();
+        }
+        else if(expression.getType().equals("newExpression")) {
             writeOutput(identifier.getRegName() + "\n\n");
             return null;
         }
 
-        switch (expression.getType()) {
-            case "int":
-                writeOutput("\tstore i32 " + expression.getName() + ", i32* " + identifier.getRegName() + "\n\n");
-                break;
-            case "boolean":
-                writeOutput("\tstore i1 " + expression.getName() + ", i1* " + identifier.getRegName() + "\n\n");
-                break;
-            default:
-                writeOutput("\tstore i8* " + expression.getName() + ", i8** " + identifier.getRegName() + "\n\n");
-        }
+        writeOutput("\tstore " + type1 + " " + arg1 + ", " + type2 + " " + arg2 + "\n\n");
 
-        System.out.println("AssignmentStatement ends");
+        //System.out.println("AssignmentStatement ends");
         return null;
     }
 
@@ -211,10 +240,147 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | Clause()
      */
     public Info visit(Expression n, Info argu) {
-        System.out.println("Expression starts");
+        //System.out.println("Expression starts");
         FieldInfo expression = (FieldInfo)n.f0.accept(this, null);
-        System.out.println("Expression ends");
+        //System.out.println("Expression ends");
         return expression;
+    }
+
+    /**
+     * f0 -> PrimaryExpression()
+     * f1 -> "."
+     * f2 -> Identifier()
+     * f3 -> "("
+     * f4 -> ( ExpressionList() )?
+     * f5 -> ")"
+     */
+    public Info visit(MessageSend n, Info argu) {
+
+        //System.out.println("MessageSend starts");
+
+        int index;
+        String type;
+        String methodName;
+        FieldInfo primaryExpression;
+        MethodInfo calledMethod;
+        String[] registerName;
+        FieldInfo messageSend = null;
+
+        registerName = new String[7];
+        primaryExpression = (FieldInfo)n.f0.accept(this, null);
+
+        if(primaryExpression.getType().equals("identifier")) {
+            // The primary expression is an object of a class
+
+            // Case 1: Local variable of the method
+            if(currentMethod.variableNameExists(primaryExpression.getName())) {
+                //System.out.println("\tCase 1");
+                primaryExpression = currentMethod.getCertainVariable(primaryExpression.getName());
+
+                // Load the object pointer
+                registerName[0] = "%_" + registers;
+                registers++;
+                writeOutput("\t" + registerName[0] + " = load i8*, i8** " + primaryExpression.getRegName() + "\n\n");
+
+                // Doing the required bitcasts so that we can access the v-table
+                registerName[1] = "%_" + registers;
+                registers++;
+                writeOutput("\t" + registerName[1] + " = bitcast i8* " + registerName[0] + " to i8***\n\n");
+
+                // Loading the v-table pointer
+                registerName[2] = "%_" + registers;
+                registers++;
+                writeOutput("\t" + registerName[2] + " = load i8**, i8*** " + registerName[1] + "\n\n");
+
+                // Getting the name of the method that's being called
+                methodName = ((FieldInfo)n.f2.accept(this, null)).getName();
+                calledMethod = symbolTable.getClass(primaryExpression.getType()).getClassMethod(methodName);
+                if(calledMethod == null) {
+                    System.out.print("Error: Method " + calledMethod + " doesn't exist in class " + primaryExpression.getType());
+                    System.out.println(" or any of its superclasses");
+                    System.exit(1);
+                }
+
+                index = calledMethod.getOffset();
+                //System.out.print("\tCalled method: " + methodName + " (Owner: " + calledMethod.getOwner().getName() + ", ");
+                //System.out.println("Offset: " + calledMethod.getOffset() + ")");
+
+                // Getting a pointer to the first entry of the v-table
+                registerName[3] = "%_" + registers;
+                registers++;
+                writeOutput("\t" + registerName[3] + " = getelementptr i8*, i8** " + registerName[2] + ", i32 " + index + "\n\n");
+
+                // Getting the actual function pointer
+                registerName[4] = "%_" + registers;
+                registers++;
+                writeOutput("\t" + registerName[4] + " = load i8*, i8** " + registerName[3] + "\n\n");
+
+                // Casting the function pointer from i8* to a function ptr type that matches its signature
+                registerName[5] = "%_" + registers;
+                registers++;
+                type = vTables.setType(calledMethod.getReturnType());
+                writeOutput("\t" + registerName[5] + " bitcast i8* " + registerName[4] + " to " + type);
+                writeOutput(" (i8*");
+                for(int i = 0; i < calledMethod.getArguments().size(); i++) {
+                    writeOutput(", ");
+                    type = vTables.setType(calledMethod.getArguments().get(i).getType());
+                    writeOutput(type);
+                }
+                writeOutput(")*\n\n");
+
+                if(n.f4.present()) {
+                    n.f4.accept(this, null);
+
+                    registerName[6] = "%_" + registers;
+                    registers++;
+                    type = vTables.setType(calledMethod.getReturnType());
+                    writeOutput("\t" + registerName[6] + " = call " + type + " " + registerName[5] + "(i8* " + registerName[0]);
+
+                    for(int i = 0; i < methodArguments.size(); i++) {
+                        writeOutput(", ");
+                        writeOutput(vTables.setType(methodArguments.get(i).getType()) + " " + methodArguments.get(i).getName());
+                    }
+
+                    methodArguments.clear();
+                    writeOutput(")\n\n");
+                }
+
+                messageSend = new FieldInfo("messageSend", registerName[6], -1, false);
+            }
+        }
+
+        //System.out.println("MessageSend ends");
+        return messageSend;
+    }
+
+    /**
+     * f0 -> Expression()
+     * f1 -> ExpressionTail()
+     */
+    public Info visit(ExpressionList n, Info argu) {
+
+        FieldInfo expression;
+        FieldInfo expressionTail;
+
+        expression = (FieldInfo)n.f0.accept(this, null);
+        methodArguments.add(expression);
+
+        expressionTail = (FieldInfo)n.f1.accept(this, null);
+        if(expressionTail == null) {
+            /* do nothing */
+        }
+
+        return null;
+    }
+
+    /**
+     * f0 -> ( ExpressionTerm() )*
+     */
+    public Info visit(ExpressionTail n, Info argu) {
+        FieldInfo expressionTerm = null;
+        if(n.f0.present())
+            expressionTerm = (FieldInfo)n.f0.accept(this, null);
+        return expressionTerm;
     }
 
     /**
@@ -222,10 +388,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | PrimaryExpression()
      */
     public Info visit(Clause n, Info argu) {
-        System.out.println("Clause starts");
-        FieldInfo expression = (FieldInfo)n.f0.accept(this, null);
-        System.out.println("Clause ends");
-        return expression;
+        //System.out.println("Clause starts");
+        FieldInfo clause = (FieldInfo)n.f0.accept(this, null);
+        //System.out.println("Clause ends");
+        return clause;
     }
 
     /**
@@ -239,10 +405,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | BracketExpression()
      */
     public Info visit(PrimaryExpression n, Info argu) {
-        System.out.println("PrimaryExpression starts");
-        FieldInfo expression = (FieldInfo) n.f0.accept(this, null);
-        System.out.println("PrimaryExpression ends");
-        return expression;
+        //System.out.println("PrimaryExpression starts");
+        FieldInfo primaryExpression = (FieldInfo) n.f0.accept(this, null);
+        //System.out.println("PrimaryExpression ends");
+        return primaryExpression;
     }
 
     /**
@@ -253,7 +419,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(AllocationExpression n, Info argu) {
 
-        System.out.println("AllocationExpression starts");
+        //System.out.println("AllocationExpression starts");
 
         int size;
         int pointersTableSize;
@@ -264,7 +430,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         registerName = new String[3];
         identifier = (FieldInfo) n.f1.accept(this, null);
         newClass = symbolTable.getClass(identifier.getName());
-        System.out.println("Identifier: " + newClass.getName());
 
         size = (newClass.getObjectSize()) + 8;
         registerName[0] = "%_" + registers;
@@ -285,7 +450,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\tstore i8** " + registerName[2] + ", i8*** " + registerName[1] + "\n\n");
         writeOutput("\tstore i8* " + registerName[0] + ", i8** ");
 
-        return (new FieldInfo("newExpr", identifier.getName(), -1, false));
+        //System.out.println("AllocationExpression ends");
+        return (new FieldInfo("newExpression", identifier.getName(), -1, false));
     }
 
     /**
@@ -304,11 +470,12 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(Identifier n, Info argu) {
 
+        //System.out.println("Identifier starts");
+
         String identifierName;
-        FieldInfo identifier;
         identifierName = n.f0.toString();
 
-        //currentVariable = currentMethod.getCertainVariable(identifierName);
-        return /*null*/new FieldInfo("identifier", identifierName, -1, false);
+        //System.out.println("Identifier ends");
+        return new FieldInfo("identifier", identifierName, -1, false);
     }
 }

@@ -47,7 +47,7 @@ class Main {
             VTables vtables = new VTables(symbolTable, out);
             vtables.createClassTables();
             //vtables.printClassTables();
-            vtables.writeVTables(/*out*/);
+            vtables.writeVTables();
 
             Functions.declareFunctions(out);
 
@@ -56,7 +56,6 @@ class Main {
             /* Creating the visitor responsible for the translation */
             Translator translator = new Translator(vtables);
             root.accept(translator, null);
-
             //System.out.println(root.accept(eval, null));
         }
         catch(ParseException ex){

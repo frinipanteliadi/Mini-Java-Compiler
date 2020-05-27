@@ -11,6 +11,14 @@ public class FieldInfo extends Info {
         regName = null;
     }
 
+    public void printField() {
+        System.out.println("\t* Name: " + getName());
+        System.out.println("\t* Offset: " + getOffset());
+        System.out.println("\t* Type: " + this.type);
+        System.out.println("\t* RegName: " + this.regName);
+        System.out.println("\t* Initialized: " + this.initialized);
+    }
+
     public void setType(String type) {
         this.type = type;
     }

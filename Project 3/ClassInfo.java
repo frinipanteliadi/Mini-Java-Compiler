@@ -174,6 +174,15 @@ public class ClassInfo extends Info {
         return fields;
     }
 
+    public MethodInfo findMethod(String methodName) {
+        if(methods.contains(methodName))
+            return methodMap.get(methodName);
+        else if(inheritedMethods.contains(methodName))
+            return inheritedMethodMap.get(methodName);
+        else
+            return null;
+    }
+
     /* Methods for the HashMap */
     public void putMethod(String methodName, String returnType, int offset, ClassInfo owner) {
         methodMap.put(methodName, new MethodInfo(returnType, methodName, offset, owner));
@@ -239,5 +248,37 @@ public class ClassInfo extends Info {
         // Setting the register names for the local variables
         for(int i = 0; i < methods.size(); i++)
             methodMap.get(methods.get(i)).setRegisters();
+    }
+
+    public boolean inheritedField(String fieldName) {
+        boolean flag = false;
+        ClassInfo currentParent = parent;
+
+        while(currentParent != null) {
+
+            if(currentParent.fieldNameExists(fieldName)) {
+                flag = true;
+                break;
+            }
+
+            currentParent = currentParent.getParent();
+        }
+
+        return flag;
+    }
+
+    public FieldInfo getInheritedField(String fieldName) {
+        ClassInfo currentParent = parent;
+        FieldInfo inheritedField = null;
+
+        while (parent != null) {
+            if(currentParent.fieldNameExists(fieldName)) {
+                inheritedField = currentParent.getCertainField(fieldName);
+                break;
+            }
+            currentParent = currentParent.getParent();
+        }
+
+        return inheritedField;
     }
 }
