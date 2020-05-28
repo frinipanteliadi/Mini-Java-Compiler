@@ -201,11 +201,14 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         System.out.println("MethodDeclaration starts");
 
-        String type;
+        String type = null;
         String regName;
         String methodName;
         String returnType;
         FieldInfo identifier;
+        FieldInfo returnStatement;
+        String returnRegister = null;
+        String[] registerNames = new String[2];
 
         identifier = (FieldInfo)n.f2.accept(this, null);
         methodName = identifier.getName();
@@ -246,10 +249,49 @@ public class Translator extends GJDepthFirst<Info, Info> {
         if(n.f8.present())
             n.f8.accept(this, null);
 
+        // ** Return Statement **
+        returnStatement = (FieldInfo)n.f10.accept(this, null);
+
+        if(returnStatement.getType().equals("identifier")) {
+            if(currentMethod.variableNameExists(returnStatement.getName()))
+                // Case 1: Local variable of the method
+                returnStatement = currentMethod.getCertainVariable(returnStatement.getName());
+            else if(currentMethod.getOwner().fieldNameExists(returnStatement.getName()))
+                // Case 2: Field of the owning class
+                returnStatement = currentMethod.getOwner().getCertainField(returnStatement.getName());
+            else if(currentMethod.getOwner().inheritedField(returnStatement.getName())) {
+                // Case 3: Field of a super class
+                returnStatement = currentMethod.getOwner().getInheritedField(returnStatement.getName());
+
+                registerNames[0] = "%_" + registers;
+                registers++;
+
+                writeOutput("\t" + registerNames[0] + " = getelementptr i8, i8* %this, ");
+                writeOutput("i32 " + (returnStatement.getOffset() + 8) + "\n\n");
+
+                registerNames[1] = "%_" + registers;
+                registers++;
+
+                type = vTables.setType(returnStatement.getType());
+
+                writeOutput("\t" + registerNames[1] + " = bitcast i8* " + registerNames[0] + " to ");
+                writeOutput(type + "*\n\n");
+
+                returnRegister = "%_" + registers;
+                registers++;
+
+                writeOutput("\t" + returnRegister + " = load " + type + ", " + type + "* " + registerNames[1] + "\n\n");
+            }
+
+            writeOutput("\tret " + type + " " + returnRegister);
+        }
+
+
+
         currentMethod = null;
         registers = 0;
 
-        writeOutput("\tret " + returnType + "\n}\n\n");
+        writeOutput("\n}\n\n");
         System.out.println("MethodDeclaration ends");
         return null;
     }
@@ -307,13 +349,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
         System.out.println("AssignmentStatement starts");
 
         int flag = 0;
-        String type;
-        String regName;
         String arg1 = null;
         String arg2 = null;
         String type1 = null;
         String type2 = null;
-        //String registerName;
         FieldInfo identifier;
         FieldInfo expression;
 
@@ -347,6 +386,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(expression.getType().equals("newExpression"))
             flag = 1;
+        else if(expression.getType().equals("mult")) {
+            type1 = "i32";
+            arg1 = expression.getName();
+        }
 
         // ** Locating the identifier **
         if(identifier.getType().equals("identifier")) {
@@ -375,6 +418,18 @@ public class Translator extends GJDepthFirst<Info, Info> {
             else if(currentMethod.getOwner().inheritedField(identifier.getName())) {
                 // Case 3: Field of a super class
                 identifier = currentMethod.getOwner().getInheritedField(identifier.getName());
+
+                String registerName;
+                registerName = "%_" + registers;
+                registers++;
+
+                writeOutput("\t" + registerName + " = getelementptr i8, i8* %this, i32 " + (identifier.getOffset() + 8) + "\n\n");
+
+                type2 = vTables.setType(identifier.getType());
+                arg2 = "%_" + registers;
+                registers++;
+
+                writeOutput("\t" + arg2 + " = bitcast i8* " + registerName + " to " + type2 + "*\n\n");
             }
         }
 
@@ -384,7 +439,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
 
         writeOutput("\tstore " + type1 + " " + arg1 + ", " + type2 + "* " + arg2 + "\n\n");
-        
+
         System.out.println("AssignmentStatement ends");
         return null;
     }
@@ -405,6 +460,54 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo expression = (FieldInfo)n.f0.accept(this, null);
         System.out.println("Expression ends");
         return expression;
+    }
+
+    /**
+     * f0 -> PrimaryExpression()
+     * f1 -> "*"
+     * f2 -> PrimaryExpression()
+     */
+    public Info visit(TimesExpression n, Info argu) {
+        System.out.println("TimesExpression starts");
+
+        FieldInfo firstPrimaryExpression;
+        FieldInfo secondPrimaryExpression;
+        String factor_1 = null, factor_2 = null, product = null;
+
+        firstPrimaryExpression = (FieldInfo)n.f0.accept(this, null);
+        secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
+
+        if(firstPrimaryExpression.getType().equals("identifier")) {
+            // ** Locating the identifier **
+            if(currentMethod.variableNameExists(firstPrimaryExpression.getName())) {
+                // Case 1: Local variable of the method
+                firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
+            }
+            else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
+                // Case 2: Field of the owning class
+                firstPrimaryExpression = currentMethod.getOwner().getCertainField(firstPrimaryExpression.getName());
+            }
+            else if(currentMethod.getOwner().inheritedField(firstPrimaryExpression.getName())) {
+                // Case 3: Field of a super class
+                firstPrimaryExpression = currentMethod.getOwner().getInheritedField(firstPrimaryExpression.getName());
+            }
+
+            factor_1 = "%_" + registers;
+            registers++;
+
+            writeOutput("\t" + factor_1 + " = load i32, i32* " + firstPrimaryExpression.getRegName() + "\n\n");
+        }
+
+        if(secondPrimaryExpression.getType().equals("int"))
+            factor_2 = secondPrimaryExpression.getName();
+
+        product = "%_" + registers;
+        registers++;
+
+        writeOutput("\t" + product + " = mul i32 " + factor_1 + ", " + factor_2 + "\n\n");
+
+        System.out.println("TimesExpression ends");
+        return new FieldInfo("mult", product, -1, false);
     }
 
     /**
