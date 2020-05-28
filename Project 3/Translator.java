@@ -41,6 +41,23 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
     }
 
+    public FieldInfo findLocation(FieldInfo value) {
+
+        FieldInfo returnValue = null;
+
+        if(currentMethod.variableNameExists(value.getName()))
+            // Case 1: Local variable of the method
+            returnValue = currentMethod.getCertainVariable(value.getName());
+        else if(currentMethod.getOwner().fieldNameExists(value.getName()))
+            // Case 2: Field of the owning class
+            returnValue = currentMethod.getOwner().getCertainField(value.getName());
+        else if(currentMethod.getOwner().inheritedField(value.getName()))
+            // Case 3: Field of a super class
+            returnValue = currentMethod.getOwner().getInheritedField(value.getName());
+
+        return returnValue;
+    }
+
     /**
      * f0 -> "class"
      * f1 -> Identifier()
@@ -120,6 +137,25 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo statement = (FieldInfo)n.f0.accept(this, null);
         System.out.println("Statement ends");
         return statement;
+    }
+
+    /**
+     * Grammar production:
+     * f0 -> "if"
+     * f1 -> "("
+     * f2 -> Expression()
+     * f3 -> ")"
+     * f4 -> Statement()
+     * f5 -> "else"
+     * f6 -> Statement()
+     */
+    public Info visit(IfStatement n, Info argu) {
+
+        FieldInfo expression;
+
+        expression = (FieldInfo)n.f2.accept(this, null);
+
+        return super.visit(n, argu);
     }
 
     /**
@@ -460,6 +496,58 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo expression = (FieldInfo)n.f0.accept(this, null);
         System.out.println("Expression ends");
         return expression;
+    }
+
+    /**
+     * f0 -> PrimaryExpression()
+     * f1 -> "<"
+     * f2 -> PrimaryExpression()
+     */
+    public Info visit(CompareExpression n, Info argu) {
+
+        System.out.println("CompareExpression starts");
+
+        String result;
+        String left = null, right = null;
+        FieldInfo firstPrimaryExpression, secondPrimaryExpression;
+
+        firstPrimaryExpression = (FieldInfo)n.f0.accept(this, null);
+        secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
+
+        if(firstPrimaryExpression.getType().equals("identifier")) {
+            // ** Locating the identifier **
+            if(currentMethod.variableNameExists(firstPrimaryExpression.getName())) {
+                // Case 1: Local variable of the method
+                firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
+
+                left = "%_" + registers;
+                registers++;
+
+                writeOutput("\t" + left + " = load " + vTables.setType(firstPrimaryExpression.getType()));
+                writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
+                writeOutput(firstPrimaryExpression.getRegName() + "\n\n");
+
+            }
+            else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
+                // Case 2: Field of the owning method
+                firstPrimaryExpression = currentMethod.getOwner().getCertainField(firstPrimaryExpression.getName());
+            }
+            else if(currentMethod.getOwner().inheritedField(firstPrimaryExpression.getName())) {
+                // Case 3: Field of a super class
+                firstPrimaryExpression = currentMethod.getOwner().getInheritedField(firstPrimaryExpression.getName());
+            }
+        }
+
+        if(secondPrimaryExpression.getType().equals("int"))
+            right = secondPrimaryExpression.getName();
+
+        result = "%_" + registers;
+        registers++;
+
+        writeOutput("\t" + result + " = icmp slt i32 " + left + ", " + right + "\n\n");
+
+        System.out.println("CompareExpression ends");
+        return super.visit(n, argu);
     }
 
     /**
