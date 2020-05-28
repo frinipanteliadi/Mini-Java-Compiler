@@ -224,6 +224,6 @@ public class MethodInfo extends Info {
 
     public void setRegisters() {
         for(int i = 0; i < variables.size(); i++)
-            variables.get(i).setRegName(owner.getName() + "_" + this.getName() + "_" + variables.get(i).getName());
+            variables.get(i).setRegName("%" + owner.getName() + "_" + this.getName() + "_" + variables.get(i).getName());
     }
 }
