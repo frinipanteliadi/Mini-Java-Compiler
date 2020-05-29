@@ -2,6 +2,7 @@ import syntaxtree.*;
 import visitor.GJDepthFirst;
 
 import java.io.FileOutputStream;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,6 +10,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
     private int ifCounter;
     private int registers;
+    private int labelCounter;
     private VTables vTables;
     private FileOutputStream out;
     private ClassInfo currentClass;
@@ -22,6 +24,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         ifCounter = 0;
         registers = 0;
+        labelCounter = 0;
         this.vTables = vTables;
         out = vTables.getOutFile();
         currentClass = null;
@@ -105,9 +108,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 registerName = "%" + mainClassName + "_" + currentMethod.getName() + "_" + currentVariable.getName();
                 currentVariable.setRegName(registerName);
 
-                writeOutput("\t" + registerName + " = alloca " + type + "\n\n");
+                writeOutput("\t" + registerName + " = alloca " + type + "\n");
             }
         }
+
+        writeOutput("\n");
 
         currentVariable = null; // We're done with this (for now)
 
@@ -115,7 +120,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         if(n.f15.present())
             n.f15.accept(this, null);
 
-        writeOutput("\tret i32 0\n}\n\n");
+        writeOutput("\n\tret i32 0\n}\n\n");
 
         currentClass = null;
         currentMethod = null;
@@ -142,7 +147,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
     }
 
     /**
-     * Grammar production:
      * f0 -> "if"
      * f1 -> "("
      * f2 -> Expression()
@@ -166,6 +170,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
         expression = (FieldInfo)n.f2.accept(this, null);
 
         if(expression.getType().equals("compareExpr")) {
+            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
+            writeOutput("label %" + elseLabel + "\n\n");
+        }
+        else if(expression.getType().equals("andExpr")) {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
         }
@@ -296,7 +304,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         for(int i = 0; i < currentMethod.getVariables().size(); i++) {
             currentVariable = currentMethod.getVariables().get(i);
             type = vTables.setType(currentVariable.getType());
-            writeOutput("\t" + currentVariable.getRegName() + " = alloca " + type + "\n\n");
+            writeOutput("\t" + currentVariable.getRegName() + " = alloca " + type + "\n");
 
             if(currentMethod.isArgument(currentVariable)) {
                 String[] str_array = currentVariable.getRegName().split("%");
@@ -305,11 +313,15 @@ public class Translator extends GJDepthFirst<Info, Info> {
             }
         }
 
+        writeOutput("\n");
+
         currentVariable = null;
 
         // ** Statement **
         if(n.f8.present())
             n.f8.accept(this, null);
+
+        writeOutput("\n");
 
         // ** Return Statement **
         returnStatement = (FieldInfo)n.f10.accept(this, null);
@@ -319,6 +331,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Case 1: Local variable of the method
                 returnStatement = currentMethod.getCertainVariable(returnStatement.getName());
 
+                returnRegister =  returnStatement.getRegName();
+                type = returnStatement.getType();
             }
             else if(currentMethod.getOwner().fieldNameExists(returnStatement.getName())) {
                 // Case 2: Field of the owning class
@@ -365,10 +379,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + returnRegister + " = load " + type + ", " + type + "* " + registerNames[1] + "\n\n");
             }
 
-            writeOutput("\tret " + type + " " + returnRegister);
+            writeOutput("\n\tret " + type + " " + returnRegister);
         }
         else if(returnStatement.getType().equals("int")) {
-            writeOutput("\tret i32 " + returnStatement.getName());
+            writeOutput("\n\tret i32 " + returnStatement.getName());
         }
 
 
@@ -408,7 +422,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 type = vTables.setType(expression.getType());
                 registerName = "%_" + registers;
                 registers++;
-                writeOutput("\t" + registerName + " = load " + type + ", " + type + "* " + expression.getRegName() + "\n\n");
+                writeOutput("\t" + registerName + " = load " + type + ", " + type + "* " + expression.getRegName() + "\n");
 
                 writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
             }
@@ -509,6 +523,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
             type1 = "i32";
             arg1 = expression.getName();
         }
+        else if(expression.getType().equals("boolean")) {
+            type1 = "i1";
+            if(expression.getName() == "false")
+                arg1 = "0";
+            else
+                arg1 = "1";
+        }
 
         // ** Locating the identifier **
         if(identifier.getType().equals("identifier")) {
@@ -579,6 +600,71 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo expression = (FieldInfo)n.f0.accept(this, null);
         System.out.println("Expression ends");
         return expression;
+    }
+
+    /**
+     * f0 -> Clause()
+     * f1 -> "&&"
+     * f2 -> Clause()
+     */
+    public Info visit(AndExpression n, Info argu) {
+
+        System.out.println("AndExpression starts");
+
+        String result;
+        String left = null, right = null;
+        String label_0, label_1, label_2, label_3;
+        FieldInfo firstClause, secondClause;
+
+        firstClause = (FieldInfo)n.f0.accept(this, null);
+
+        if(firstClause.getType().equals("identifier")) {
+
+            if(currentMethod.variableNameExists(firstClause.getName())) {
+                // Case 1: Local variable of the method
+                firstClause = currentMethod.getCertainVariable(firstClause.getName());
+
+                left = "%_" + registers++;
+                writeOutput("\t" + left + " = load i1, i1* " + firstClause.getRegName() + "\n");
+            }
+        }
+
+        label_0 = "exp_res_" + labelCounter++;
+        label_1 = "exp_res_" + labelCounter++;
+        label_2 = "exp_res_" + labelCounter++;
+        label_3 = "exp_res_" + labelCounter++;
+
+        writeOutput("\tbr i1 " + left + ", label %" + label_1 + ", label %" + label_0 + "\n\n");
+
+        writeOutput("\t" + label_0 + ":\n");
+        writeOutput("\tbr label %" + label_2 + "\n\n");
+
+        writeOutput("\t" + label_1 + ":\n");
+        secondClause = (FieldInfo)n.f2.accept(this, null);
+
+        if(secondClause.getType().equals("identifier")) {
+            if(currentMethod.variableNameExists(secondClause.getName())) {
+                // Case 1: Local variable of the method
+                secondClause = currentMethod.getCertainVariable(secondClause.getName());
+
+                right = "%_" + registers++;
+                writeOutput("\t" + right + " = load i1, i1* " + secondClause.getRegName() + "\n\n");
+            }
+        }
+
+        writeOutput("\tbr label %" + label_2 + "\n\n");
+
+
+        writeOutput("\t" + label_2 + ":\n");
+        writeOutput("\tbr label %" + label_3 + "\n\n");
+
+        writeOutput("\t" + label_3 + ":\n");
+        result = "%_" + registers++;
+        writeOutput("\t" + result + " = phi i1 [0, %" + label_0 + "], ");
+        writeOutput("[" + right + ", %" + label_2 + "]\n\n");
+
+        System.out.println("AndExpression end");
+        return new FieldInfo("andExpr", result, -1, false);
     }
 
     /**
@@ -847,6 +933,30 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo primaryExpression = (FieldInfo) n.f0.accept(this, null);
         System.out.println("PrimaryExpression ends");
         return primaryExpression;
+    }
+
+    /**
+     * f0 -> "false"
+     */
+    public Info visit(FalseLiteral n, Info argu) {
+        System.out.println("FalseLiteral starts");
+
+        String booleanValue = n.f0.toString();
+
+        System.out.println("FalseLiteral ends");
+        return new FieldInfo("boolean", booleanValue, -1, false);
+    }
+
+    /**
+     * f0 -> "true"
+     */
+    public Info visit(TrueLiteral n, Info argu) {
+        System.out.println("TrueLiteral starts");
+
+        String booleanValue = n.f0.toString();
+
+        System.out.println("TrueLiteral ends");
+        return new FieldInfo("boolean", booleanValue, -1, false);
     }
 
     /**
