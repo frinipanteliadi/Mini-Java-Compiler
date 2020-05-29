@@ -180,7 +180,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         writeOutput("\t" + endLabel + ":\n");
 
-        System.out.println("IfStatement end");
+        System.out.println("IfStatement ends");
         return null;
     }
 
@@ -315,9 +315,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
         returnStatement = (FieldInfo)n.f10.accept(this, null);
 
         if(returnStatement.getType().equals("identifier")) {
-            if(currentMethod.variableNameExists(returnStatement.getName()))
+            if(currentMethod.variableNameExists(returnStatement.getName())) {
                 // Case 1: Local variable of the method
                 returnStatement = currentMethod.getCertainVariable(returnStatement.getName());
+
+            }
             else if(currentMethod.getOwner().fieldNameExists(returnStatement.getName())) {
                 // Case 2: Field of the owning class
                 returnStatement = currentMethod.getOwner().getCertainField(returnStatement.getName());
@@ -365,7 +367,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
             writeOutput("\tret " + type + " " + returnRegister);
         }
-
+        else if(returnStatement.getType().equals("int")) {
+            writeOutput("\tret i32 " + returnStatement.getName());
+        }
 
 
         currentMethod = null;
@@ -396,19 +400,51 @@ public class Translator extends GJDepthFirst<Info, Info> {
         if(expression.getType().equals("identifier")) {
             String identifierName;
 
-            // Case 1: Local variable of the method
             identifierName = expression.getName();
 
             if(currentMethod.variableNameExists(identifierName)) {
+                // Case 1: Local variable of the method
                 expression = currentMethod.getCertainVariable(identifierName);
                 type = vTables.setType(expression.getType());
                 registerName = "%_" + registers;
+                registers++;
                 writeOutput("\t" + registerName + " = load " + type + ", " + type + "* " + expression.getRegName() + "\n\n");
 
                 writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
             }
+            else if(currentMethod.getOwner().fieldNameExists(identifierName)) {
+                // Case 2: Field of the owning class
+                expression = currentMethod.getOwner().getCertainField(identifierName);
 
-            registers++;
+                // Getting a pointer to the field
+                String ptr = "%_" + registers;
+                registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (expression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                registerName = "%_" + registers;
+                registers++;
+                writeOutput("\t" + registerName + " = bitcast i8* " + ptr + " to " + vTables.setType(expression.getType()) + "*\n");
+                writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
+
+
+            }
+            else if(currentMethod.getOwner().inheritedField(identifierName)) {
+                // Case 3: Field of a super class
+                expression = currentMethod.getOwner().getInheritedField(identifierName);
+
+                // Getting a pointer to the field
+                String ptr = "%_" + registers;
+                registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (expression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                registerName = "%_" + registers;
+                registers++;
+                writeOutput("\t" + registerName + " = bitcast i8* " + ptr + " to " + vTables.setType(expression.getType()) + "*\n");
+                writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
+            }
+
         }
         else if(expression.getType().equals("messageSend")) {
             writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
