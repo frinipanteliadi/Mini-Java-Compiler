@@ -7,6 +7,7 @@ import java.util.List;
 
 public class Translator extends GJDepthFirst<Info, Info> {
 
+    private int ifCounter;
     private int registers;
     private VTables vTables;
     private FileOutputStream out;
@@ -19,6 +20,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
     // Constructor
     public Translator(VTables vTables) {
 
+        ifCounter = 0;
         registers = 0;
         this.vTables = vTables;
         out = vTables.getOutFile();
@@ -151,11 +153,35 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(IfStatement n, Info argu) {
 
+        System.out.println("IfStatement starts");
+
         FieldInfo expression;
+        String ifLabel, elseLabel, endLabel;
+
+        ifLabel = "if_then_" + ifCounter;
+        elseLabel = "if_else_" + ifCounter;
+        endLabel = "if_end_" + ifCounter;
+        ifCounter++;
 
         expression = (FieldInfo)n.f2.accept(this, null);
 
-        return super.visit(n, argu);
+        if(expression.getType().equals("compareExpr")) {
+            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
+            writeOutput("label %" + elseLabel + "\n\n");
+        }
+
+        writeOutput("\t" + elseLabel + ":\n");
+        n.f6.accept(this, null);
+        writeOutput("\tbr label %" + endLabel + "\n\n");
+
+        writeOutput("\t" + ifLabel + ":\n");
+        n.f4.accept(this, null);
+        writeOutput("\tbr label %" + endLabel + "\n\n");
+
+        writeOutput("\t" + endLabel + ":\n");
+
+        System.out.println("IfStatement end");
+        return null;
     }
 
     /**
@@ -379,17 +405,20 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 registerName = "%_" + registers;
                 writeOutput("\t" + registerName + " = load " + type + ", " + type + "* " + expression.getRegName() + "\n\n");
 
-                writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n\n");
+                writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
             }
 
             registers++;
         }
         else if(expression.getType().equals("messageSend")) {
-            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n\n");
+            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
+        }
+        else if(expression.getType().equals("int")) {
+            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
         }
 
         System.out.println("PrintStatement ends");
-        return /*null*/expression;
+        return expression;
     }
 
     /**
@@ -543,7 +572,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
                 writeOutput("\t" + left + " = load " + vTables.setType(firstPrimaryExpression.getType()));
                 writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
-                writeOutput(firstPrimaryExpression.getRegName() + "\n\n");
+                writeOutput(firstPrimaryExpression.getRegName() + "\n");
 
             }
             else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
@@ -562,10 +591,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
         result = "%_" + registers;
         registers++;
 
-        writeOutput("\t" + result + " = icmp slt i32 " + left + ", " + right + "\n\n");
+        writeOutput("\t" + result + " = icmp slt i32 " + left + ", " + right + "\n");
 
         System.out.println("CompareExpression ends");
-        return super.visit(n, argu);
+        return new FieldInfo("compareExpr", result, -1, false);
     }
 
     /**
