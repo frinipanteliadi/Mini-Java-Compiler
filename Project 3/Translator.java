@@ -292,9 +292,27 @@ public class Translator extends GJDepthFirst<Info, Info> {
             if(currentMethod.variableNameExists(returnStatement.getName()))
                 // Case 1: Local variable of the method
                 returnStatement = currentMethod.getCertainVariable(returnStatement.getName());
-            else if(currentMethod.getOwner().fieldNameExists(returnStatement.getName()))
+            else if(currentMethod.getOwner().fieldNameExists(returnStatement.getName())) {
                 // Case 2: Field of the owning class
                 returnStatement = currentMethod.getOwner().getCertainField(returnStatement.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers;
+                registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (returnStatement.getOffset()+8) + "\n");
+
+                // Performing the necassary bitcasts
+                String temp = "%_" + registers;
+                registers++;
+                writeOutput("\t" + temp + " = bitcast i8* " + ptr + " to " + vTables.setType(returnStatement.getType()) + "*\n");
+
+                returnRegister = "%_" + registers;
+                registers++;
+                writeOutput("\t" + returnRegister + " load " + vTables.setType(returnStatement.getType()) + ", ");
+                writeOutput(vTables.setType(returnStatement.getType()) + "* " + temp + "\n\n");
+
+                type = returnStatement.getType();
+            }
             else if(currentMethod.getOwner().inheritedField(returnStatement.getName())) {
                 // Case 3: Field of a super class
                 returnStatement = currentMethod.getOwner().getInheritedField(returnStatement.getName());
@@ -303,7 +321,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 registers++;
 
                 writeOutput("\t" + registerNames[0] + " = getelementptr i8, i8* %this, ");
-                writeOutput("i32 " + (returnStatement.getOffset() + 8) + "\n\n");
+                writeOutput("i32 " + (returnStatement.getOffset() + 8) + "\n");
 
                 registerNames[1] = "%_" + registers;
                 registers++;
@@ -311,7 +329,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 type = vTables.setType(returnStatement.getType());
 
                 writeOutput("\t" + registerNames[1] + " = bitcast i8* " + registerNames[0] + " to ");
-                writeOutput(type + "*\n\n");
+                writeOutput(type + "*\n");
 
                 returnRegister = "%_" + registers;
                 registers++;
@@ -409,7 +427,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 arg1 = "%_" + registers;
                 registers++;
 
-                writeOutput("\t" + arg1 + " = load " + type1 + ", " + type1 + "* " + expression.getRegName() + "\n\n");
+                writeOutput("\t" + arg1 + " = load " + type1 + ", " + type1 + "* " + expression.getRegName() + "\n");
             }
             else if(currentMethod.getOwner().fieldNameExists(expression.getName())) {
                 // Case 2: Field of the owning class
@@ -443,13 +461,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 registerName= "%_" + registers;
                 registers++;
 
-                writeOutput("\t" + registerName + " = getelementptr i8, i8* %this, i32 " + (identifier.getOffset() + 8) + "\n\n");
+                writeOutput("\t" + registerName + " = getelementptr i8, i8* %this, i32 " + (identifier.getOffset() + 8) + "\n");
 
                 type2 = vTables.setType(identifier.getType());
                 arg2 = "%_" + registers;
                 registers++;
 
-                writeOutput("\t" + arg2 + " = bitcast i8* " + registerName + " to " + type2 + "*\n\n");
+                writeOutput("\t" + arg2 + " = bitcast i8* " + registerName + " to " + type2 + "*\n");
             }
             else if(currentMethod.getOwner().inheritedField(identifier.getName())) {
                 // Case 3: Field of a super class
@@ -459,13 +477,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 registerName = "%_" + registers;
                 registers++;
 
-                writeOutput("\t" + registerName + " = getelementptr i8, i8* %this, i32 " + (identifier.getOffset() + 8) + "\n\n");
+                writeOutput("\t" + registerName + " = getelementptr i8, i8* %this, i32 " + (identifier.getOffset() + 8) + "\n");
 
                 type2 = vTables.setType(identifier.getType());
                 arg2 = "%_" + registers;
                 registers++;
 
-                writeOutput("\t" + arg2 + " = bitcast i8* " + registerName + " to " + type2 + "*\n\n");
+                writeOutput("\t" + arg2 + " = bitcast i8* " + registerName + " to " + type2 + "*\n");
             }
         }
 
@@ -583,7 +601,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
             factor_1 = "%_" + registers;
             registers++;
 
-            writeOutput("\t" + factor_1 + " = load i32, i32* " + firstPrimaryExpression.getRegName() + "\n\n");
+            writeOutput("\t" + factor_1 + " = load i32, i32* " + firstPrimaryExpression.getRegName() + "\n");
         }
 
         if(secondPrimaryExpression.getType().equals("int"))
@@ -658,12 +676,12 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Getting a pointer to the first entry of the v-table
                 registerName[3] = "%_" + registers;
                 registers++;
-                writeOutput("\t" + registerName[3] + " = getelementptr i8*, i8** " + registerName[2] + ", i32 " + index + "\n\n");
+                writeOutput("\t" + registerName[3] + " = getelementptr i8*, i8** " + registerName[2] + ", i32 " + index + "\n");
 
                 // Getting the actual function pointer
                 registerName[4] = "%_" + registers;
                 registers++;
-                writeOutput("\t" + registerName[4] + " = load i8*, i8** " + registerName[3] + "\n\n");
+                writeOutput("\t" + registerName[4] + " = load i8*, i8** " + registerName[3] + "\n");
 
                 // Casting the function pointer from i8* to a function ptr type that matches its signature
                 registerName[5] = "%_" + registers;
@@ -800,9 +818,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
         registers++;
         writeOutput("\t" + registerName[2] + " = getelementptr [" + pointersTableSize + " x i8*], [");
         writeOutput(pointersTableSize + " x i8*]* " + vTables.getClassTables(identifier.getName()).getVTableName());
-        writeOutput(", i32 0, i32 0\n\n");
+        writeOutput(", i32 0, i32 0\n");
 
-        writeOutput("\tstore i8** " + registerName[2] + ", i8*** " + registerName[1] + "\n\n");
+        writeOutput("\tstore i8** " + registerName[2] + ", i8*** " + registerName[1] + "\n");
         writeOutput("\tstore i8* " + registerName[0] + ", i8** ");
 
         System.out.println("AllocationExpression ends");
