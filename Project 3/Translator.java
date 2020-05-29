@@ -460,12 +460,15 @@ public class Translator extends GJDepthFirst<Info, Info> {
             }
 
         }
-        else if(expression.getType().equals("messageSend")) {
+        else if(expression.getType().equals("messageSend") || expression.getType().equals("int") ||
+                expression.getType().equals("add") || expression.getType().equals("sub"))
             writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
-        }
-        else if(expression.getType().equals("int")) {
-            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
-        }
+//        else if(expression.getType().equals("int"))
+//            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
+//        else if(expression.getType().equals("add"))
+//            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
+//        else if(expression.getType().equals("sub"))
+//            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
 
         System.out.println("PrintStatement ends");
         return expression;
@@ -600,6 +603,225 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo expression = (FieldInfo)n.f0.accept(this, null);
         System.out.println("Expression ends");
         return expression;
+    }
+
+    /**
+     * f0 -> PrimaryExpression()
+     * f1 -> "+"
+     * f2 -> PrimaryExpression()
+     */
+    public Info visit(PlusExpression n, Info argu) {
+        System.out.println("PlusExpression starts");
+
+        FieldInfo firstPrimaryExpression;
+        FieldInfo secondPrimaryExpression;
+        String addend_1 = null, addend_2 = null, sum = null;
+
+        firstPrimaryExpression = (FieldInfo)n.f0.accept(this, null);
+        secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
+
+        if(firstPrimaryExpression.getType().equals("identifier")) {
+            if(currentMethod.variableNameExists(firstPrimaryExpression.getName())) {
+                // Case 1: Local variable of the method
+                firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
+
+                addend_1 = "%_" + registers++;
+
+                writeOutput("\t" + addend_1 + " = load " + vTables.setType(firstPrimaryExpression.getType()));
+                writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
+                writeOutput(firstPrimaryExpression.getRegName() + "\n");
+            }
+            else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
+                // Case 2: Field of the owning class
+                firstPrimaryExpression = currentMethod.getOwner().getCertainField(firstPrimaryExpression.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = "%_" + registers++;
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                addend_1 = "%_" + registers++;
+                writeOutput("\t" + addend_1 + " = load i32, i32* " + bitcast + "\n");
+            }
+            else if(currentMethod.getOwner().inheritedField(firstPrimaryExpression.getName())) {
+                firstPrimaryExpression = currentMethod.getOwner().getInheritedField(firstPrimaryExpression.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = "%_" + registers++;
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                addend_1 = "%_" + registers++;
+                writeOutput("\t" + addend_1 + " = load i32, i32* " + bitcast + "\n");
+            }
+        }
+        else if(firstPrimaryExpression.getType().equals("int"))
+            addend_1 = firstPrimaryExpression.getName();
+
+        if(secondPrimaryExpression.getType().equals("identifier")) {
+            if(currentMethod.variableNameExists(secondPrimaryExpression.getName())) {
+                // Case 1: Local variable of the method
+                secondPrimaryExpression = currentMethod.getCertainVariable(secondPrimaryExpression.getName());
+
+                addend_2 = "%_" + registers++;
+
+                writeOutput("\t" + addend_2 + " = load " + vTables.setType(secondPrimaryExpression.getType()));
+                writeOutput(", " + vTables.setType(secondPrimaryExpression.getType()) + "* ");
+                writeOutput(secondPrimaryExpression.getRegName() + "\n");
+            }
+            else if(currentMethod.getOwner().fieldNameExists(secondPrimaryExpression.getName())) {
+                // Case 2: Field of the owning class
+                secondPrimaryExpression = currentMethod.getOwner().getCertainField(secondPrimaryExpression.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = "%_" + registers++;
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                addend_2 = "%_" + registers++;
+                writeOutput("\t" + addend_2 + " = load i32, i32* " + bitcast + "\n");
+            }
+            else if(currentMethod.getOwner().inheritedField(secondPrimaryExpression.getName())) {
+                // Case 3: Field of a super class
+                secondPrimaryExpression = currentMethod.getOwner().getInheritedField(secondPrimaryExpression.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = "%_" + registers++;
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                addend_2 = "%_" + registers++;
+                writeOutput("\t" + addend_2 + " = load i32, i32* " + bitcast + "\n");
+            }
+        }
+        else if(secondPrimaryExpression.getType().equals("int"))
+            addend_2 = secondPrimaryExpression.getName();
+
+        sum = "%_" + registers++;
+        writeOutput("\t" + sum + " = add i32 " + addend_1 + ", " + addend_2 + "\n");
+
+        return new FieldInfo("add", sum, -1, false);
+    }
+
+    /**
+     * f0 -> PrimaryExpression()
+     * f1 -> "-"
+     * f2 -> PrimaryExpression()
+     */
+    public Info visit(MinusExpression n, Info argu) {
+
+        FieldInfo firstPrimaryExpression;
+        FieldInfo secondPrimaryExpression;
+        String minuend = null, subtrahend = null, difference = null;
+
+        firstPrimaryExpression = (FieldInfo)n.f0.accept(this, null);
+        secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
+
+        if(firstPrimaryExpression.getType().equals("identifier")) {
+            if(currentMethod.variableNameExists(firstPrimaryExpression.getName())) {
+                // Case 1: Local variable of the method
+                firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
+
+                minuend = "%_" + registers++;
+
+                writeOutput("\t" + minuend + " = load " + vTables.setType(firstPrimaryExpression.getType()));
+                writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
+                writeOutput(firstPrimaryExpression.getRegName() + "\n");
+            }
+            else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
+                // Case 2: Field of the owning class
+                firstPrimaryExpression = currentMethod.getOwner().getCertainField(firstPrimaryExpression.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = "%_" + registers++;
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                minuend = "%_" + registers++;
+                writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
+            }
+            else if(currentMethod.getOwner().inheritedField(firstPrimaryExpression.getName())) {
+                firstPrimaryExpression = currentMethod.getOwner().getInheritedField(firstPrimaryExpression.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = "%_" + registers++;
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                minuend = "%_" + registers++;
+                writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
+            }
+        }
+        else if(firstPrimaryExpression.getType().equals("int"))
+            minuend = firstPrimaryExpression.getName();
+
+        if(secondPrimaryExpression.getType().equals("identifier")) {
+            if(currentMethod.variableNameExists(secondPrimaryExpression.getName())) {
+                // Case 1: Local variable of the method
+                secondPrimaryExpression = currentMethod.getCertainVariable(secondPrimaryExpression.getName());
+
+                subtrahend = "%_" + registers++;
+
+                writeOutput("\t" + subtrahend + " = load " + vTables.setType(secondPrimaryExpression.getType()));
+                writeOutput(", " + vTables.setType(secondPrimaryExpression.getType()) + "* ");
+                writeOutput(secondPrimaryExpression.getRegName() + "\n");
+            }
+            else if(currentMethod.getOwner().fieldNameExists(secondPrimaryExpression.getName())) {
+                // Case 2: Field of the owning class
+                secondPrimaryExpression = currentMethod.getOwner().getCertainField(secondPrimaryExpression.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = "%_" + registers++;
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                subtrahend = "%_" + registers++;
+                writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
+            }
+            else if(currentMethod.getOwner().inheritedField(secondPrimaryExpression.getName())) {
+                // Case 3: Field of a super class
+                secondPrimaryExpression = currentMethod.getOwner().getInheritedField(secondPrimaryExpression.getName());
+
+                // Getting a pointer to the data field
+                String ptr = "%_" + registers++;
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = "%_" + registers++;
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                subtrahend = "%_" + registers++;
+                writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
+            }
+        }
+        else if(secondPrimaryExpression.getType().equals("int"))
+            subtrahend = secondPrimaryExpression.getName();
+
+        difference = "%_" + registers++;
+        writeOutput("\t" + difference + " = sub i32 " + minuend + ", " + subtrahend + "\n");
+
+        return new FieldInfo("sub", difference, -1, false);
     }
 
     /**
@@ -982,11 +1204,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
         size = (newClass.getObjectSize()) + 8;
         registerName[0] = "%_" + registers;
         registers++;
-        writeOutput("\t" + registerName[0] + " = call i8* @calloc(i32 1, i32 " + size + ")\n\n");
+        writeOutput("\t" + registerName[0] + " = call i8* @calloc(i32 1, i32 " + size + ")\n");
 
         registerName[1] = "%_" + registers;
         registers++;
-        writeOutput("\t" + registerName[1] + " = bitcast i8* " + registerName[0] + " to i8***\n\n");
+        writeOutput("\t" + registerName[1] + " = bitcast i8* " + registerName[0] + " to i8***\n");
 
         pointersTableSize = vTables.getClassTables(identifier.getName()).getPointersTable().size();
         registerName[2] = "%_" + registers;
