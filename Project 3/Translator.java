@@ -463,12 +463,12 @@ public class Translator extends GJDepthFirst<Info, Info> {
         else if(expression.getType().equals("messageSend") || expression.getType().equals("int") ||
                 expression.getType().equals("add") || expression.getType().equals("sub"))
             writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
-//        else if(expression.getType().equals("int"))
-//            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
-//        else if(expression.getType().equals("add"))
-//            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
-//        else if(expression.getType().equals("sub"))
-//            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
+//        else if(expression.getType().equals("andExpr")) {
+//            registerName = "%_" + registers++;
+//
+//            writeOutput("\t" + registerName + " = bitcast i1 " + expression.getName() + " to i32\n");
+//            writeOutput("\tcall void (i32) @print_int(i32 " + registerName + ")\n");
+//        }
 
         System.out.println("PrintStatement ends");
         return expression;
@@ -533,6 +533,14 @@ public class Translator extends GJDepthFirst<Info, Info> {
             else
                 arg1 = "1";
         }
+        else if(expression.getType().equals("messageSend")) {
+            arg1 = expression.getName();
+            flag = 2;
+        }
+        else if(expression.getType().equals("andExpr")) {
+            arg1 = expression.getName();
+            type1 = "i1";
+        }
 
         // ** Locating the identifier **
         if(identifier.getType().equals("identifier")) {
@@ -579,6 +587,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
         if(flag == 1) {
             writeOutput(identifier.getRegName() + "\n\n");
             return null;
+        }
+        else if(flag == 2){
+            type1 = type2;
         }
 
         writeOutput("\tstore " + type1 + " " + arg1 + ", " + type2 + "* " + arg2 + "\n\n");
