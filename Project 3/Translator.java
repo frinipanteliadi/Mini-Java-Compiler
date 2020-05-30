@@ -10,7 +10,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
     private int ifCounter;
     private int registers;
+    private int arrayCounter;
     private int labelCounter;
+    private int ArrayAssignmentCounter;
     private VTables vTables;
     private FileOutputStream out;
     private ClassInfo currentClass;
@@ -24,7 +26,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         ifCounter = 0;
         registers = 0;
+        arrayCounter = 0;
         labelCounter = 0;
+        ArrayAssignmentCounter = 0;
         this.vTables = vTables;
         out = vTables.getOutFile();
         currentClass = null;
@@ -103,11 +107,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
             currentVariable = currentMethod.getVariables().get(i);
             if(!currentMethod.isArgument(currentVariable)) {
+
                 type = vTables.setType(currentVariable.getType());
                 // Register Name: %<Class_Name>_<Method_Name>_<Variable_Name>
                 registerName = "%" + mainClassName + "_" + currentMethod.getName() + "_" + currentVariable.getName();
                 currentVariable.setRegName(registerName);
 
+                // Allocating space on the stack for the reference
                 writeOutput("\t" + registerName + " = alloca " + type + "\n");
             }
         }
@@ -144,6 +150,101 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo statement = (FieldInfo)n.f0.accept(this, null);
         System.out.println("Statement ends");
         return statement;
+    }
+
+    /**
+     * f0 -> Identifier()
+     * f1 -> "["
+     * f2 -> Expression()
+     * f3 -> "]"
+     * f4 -> "="
+     * f5 -> Expression()
+     * f6 -> ";"
+     */
+    public Info visit(ArrayAssignmentStatement n, Info argu) {
+        System.out.println("ArrayAssignmentStatement starts");
+
+        String[] registerNames;
+        String type;
+        String okLabel, errorLabel;
+        FieldInfo identifier;
+        FieldInfo expression;
+        FieldInfo secondExpression;
+        String result = null;
+
+        okLabel = "oob_ok_" + ArrayAssignmentCounter;
+        errorLabel = "oob_err_" + ArrayAssignmentCounter;
+        ArrayAssignmentCounter++;
+
+        registerNames = new String[7];
+
+        identifier = (FieldInfo)n.f0.accept(this, null);
+        expression = (FieldInfo)n.f2.accept(this, null);
+        secondExpression = (FieldInfo)n.f5.accept(this, null);
+
+        // ** Locating the identifier **
+        if(currentMethod.variableNameExists(identifier.getName())) {
+            // Case 1: Local variable of the method
+            identifier = currentMethod.getCertainVariable(identifier.getName());
+            type = vTables.setType(identifier.getType());
+
+
+            // Loading the address of the array
+            registerNames[0] = "%_" + registers++;
+            writeOutput("\t" + registerNames[0] + " = load " + type + ", " + type + "* " + identifier.getRegName() + "\n");
+
+            // Loading the size of the array
+            registerNames[1] = "%_" + registers++;
+            writeOutput("\t" + registerNames[1] + " = load i32, " + type + " " + registerNames[0] + "\n");
+        }
+        else if(currentMethod.getOwner().fieldNameExists(identifier.getName())) {
+            // Case 2: Field of the owning class
+            identifier = currentMethod.getOwner().getCertainField(identifier.getName());
+        }
+        else if(currentMethod.getOwner().inheritedField(identifier.getName())) {
+            // Case 3: Field of a super class
+            identifier = currentMethod.getOwner().getInheritedField(identifier.getName());
+        }
+
+        if(expression.getType().equals("int")) {
+            registerNames[2] = "%_" + registers++;
+
+            // Checking tha the index is greater than zero
+            writeOutput("\t" + registerNames[2] + " = icmp sge i32 " + expression.getName() + ", 0\n");
+
+            // Checking that the index is less than the size of the array
+            registerNames[3] = "%_" + registers++;
+            writeOutput("\t" +  registerNames[3] + " = icmp slt i32 " + expression.getName() + ", " + registerNames[1] + "\n");
+
+            // Both of the previous conditions must hold
+            registerNames[4] = "%_" + registers++; // %_8
+            writeOutput("\t" + registerNames[4] + " = and i1 " + registerNames[2] + ", " + registerNames[3] + "\n");
+            writeOutput("\tbr i1 " + registerNames[4] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
+
+            // If not, throw an out of bounds exception
+            writeOutput("\t" + errorLabel + ":\n");
+            writeOutput("\tcall void @throw_oob()\n\tbr label %" + okLabel + "\n\n");
+
+            // If everything's ok, we can safely index the array
+            writeOutput("\t" + okLabel + ":\n");
+
+            // Add one to the index, since the first element holds the size
+            registerNames[5] = "%_" + registers++;
+            writeOutput("\t" + registerNames[5] + " = add i32 1, " + expression.getName() + "\n");
+
+            // Get a pointer to the i+1 element of the array
+            registerNames[6] = "%_" + registers++;
+            writeOutput("\t" + registerNames[6] + " = getelementptr i32, i32* " + registerNames[0]);
+            writeOutput(", i32 " + registerNames[5] + "\n");
+
+            result = registerNames[6];
+        }
+
+        if(secondExpression.getType().equals("int"))
+            writeOutput("\tstore i32 " + secondExpression.getName() + ", i32* " + result + "\n\n");
+
+        System.out.println("ArrayAssignmentStatement ends");
+        return null;
     }
 
     /**
@@ -540,6 +641,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
         else if(expression.getType().equals("andExpr")) {
             arg1 = expression.getName();
             type1 = "i1";
+        }
+        else if(expression.getType().equals("newIntArrayExpr")) {
+            arg1 = expression.getName();
+            type1 = "i32*";
         }
 
         // ** Locating the identifier **
@@ -1166,6 +1271,79 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo primaryExpression = (FieldInfo) n.f0.accept(this, null);
         System.out.println("PrimaryExpression ends");
         return primaryExpression;
+    }
+
+    /**
+     * f0 -> BooleanArrayAllocationExpression()
+     *       | IntegerArrayAllocationExpression()
+     */
+    public Info visit(ArrayAllocationExpression n, Info argu) {
+        System.out.println("ArrayAllocationExpression starts");
+
+        FieldInfo arrayAllocationExpression = (FieldInfo)n.f0.accept(this, null);
+
+        System.out.println("ArrayAllocationExpression ends");
+        return arrayAllocationExpression;
+    }
+
+    /**
+     * f0 -> "new"
+     * f1 -> "int"
+     * f2 -> "["
+     * f3 -> Expression()
+     * f4 -> "]"
+     */
+    public Info visit(IntegerArrayAllocationExpression n, Info argu) {
+        System.out.println("IntegerArrayAllocationExpression starts");
+
+        FieldInfo expression;
+        String result = null;
+        String okLabel, errorLabel;
+        String[] registerNames;
+
+        okLabel = "nsz_ok_" + arrayCounter;
+        errorLabel = "nsz_err_" + arrayCounter;
+
+        expression = (FieldInfo)n.f3.accept(this, null);
+
+        if(expression.getType().equals("int")) {
+
+            registerNames = new String[4];
+
+            registerNames[0] = "%_" + registers++;
+
+            // Calculating the size of the array
+            writeOutput("\t" + registerNames[0] + " = add i32 1, " + expression.getName() + "\n");
+
+            // Checking that the size of the array is ≥ 1
+            registerNames[1] = "%_" + registers++;
+            writeOutput("\t" + registerNames[1] + " = icmp sge i32 " + registerNames[0] + ", 1\n");
+            writeOutput("\tbr i1 " + registerNames[1] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
+
+            // If the size is negative, throw a negative size exception
+            writeOutput("\t" + errorLabel + ":\n");
+            writeOutput("\tcall void @throw_nsz()\n\tbr label %" + okLabel + "\n\n");
+
+            // Since everything is ok, we're proceeding to the allocation
+            writeOutput("\t" + okLabel + ":\n");
+
+            registerNames[2] = "%_" + registers++;
+            registerNames[3] = "%_" + registers++;
+
+            // Allocating sz + 1 integers (4 bytes each)
+            writeOutput("\t" + registerNames[2] + " = call i8* @calloc(i32 " + registerNames[0] + ", i32 4)\n");
+
+            // Casting the pointer that was returned
+            writeOutput("\t" + registerNames[3] + " = bitcast i8* " + registerNames[2] + " to i32*\n");
+
+            // Storing the size of the array in the first position of the array
+            writeOutput("\tstore i32 " + expression.getName() + ", i32* " + registerNames[3] + "\n\n");
+
+            result = registerNames[3];
+        }
+
+        System.out.println("IntegerArrayAllocationExpression ends");
+        return new FieldInfo("newIntArrayExpr", result, -1, false);
     }
 
     /**
