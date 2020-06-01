@@ -561,7 +561,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         }
         else if(expression.getType().equals("messageSend") || expression.getType().equals("int") ||
-                expression.getType().equals("add") || expression.getType().equals("sub"))
+                expression.getType().equals("add") || expression.getType().equals("sub") ||
+                expression.getType().equals("mult"))
             writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
 
         System.out.println("PrintStatement ends");
@@ -742,7 +743,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         sum = getTempVariable();
         writeOutput("\t" + sum + " = add i32 " + addend_1 + ", " + addend_2 + "\n");
 
-        return new FieldInfo("add", sum, -1, false);
+        return new FieldInfo(/*"add"*/"int", sum, -1, false);
     }
 
     /**
@@ -818,7 +819,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         difference = getTempVariable();
         writeOutput("\t" + difference + " = sub i32 " + minuend + ", " + subtrahend + "\n");
 
-        return new FieldInfo("sub", difference, -1, false);
+        return new FieldInfo(/*"sub"*/"int", difference, -1, false);
     }
 
     /**
@@ -981,13 +982,37 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         if(secondPrimaryExpression.getType().equals("int"))
             factor_2 = secondPrimaryExpression.getName();
+        else if(secondPrimaryExpression.getType().equals("identifier")) {
+            variableType = findLocation(secondPrimaryExpression);
+            secondPrimaryExpression = variableType.getVariable();
+
+            if(variableType.getType().equals("local")) {
+                factor_2 = getTempVariable();
+                String type = vTables.setType(secondPrimaryExpression.getType());
+
+                // Loading the value of the variable
+                writeOutput("\t" + factor_2 + " = load " + type + ", ");
+                writeOutput(type + "* " + secondPrimaryExpression.getRegName() + '\n');
+            }
+            else {
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                factor_2 = getTempVariable();
+                writeOutput("\t" + factor_2 + " = load i32, i32* " + bitcast + "\n");
+            }
+        }
 
         product = getTempVariable();
 
         writeOutput("\t" + product + " = mul i32 " + factor_1 + ", " + factor_2 + "\n\n");
 
         System.out.println("TimesExpression ends");
-        return new FieldInfo("mult", product, -1, false);
+        return new FieldInfo(/*"mult"*/"int", product, -1, false);
     }
 
     /**
