@@ -563,12 +563,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         else if(expression.getType().equals("messageSend") || expression.getType().equals("int") ||
                 expression.getType().equals("add") || expression.getType().equals("sub"))
             writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
-//        else if(expression.getType().equals("andExpr")) {
-//            registerName = "%_" + registers++;
-//
-//            writeOutput("\t" + registerName + " = bitcast i1 " + expression.getName() + " to i32\n");
-//            writeOutput("\tcall void (i32) @print_int(i32 " + registerName + ")\n");
-//        }
 
         System.out.println("PrintStatement ends");
         return expression;
@@ -616,6 +610,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
         else if(expression.getType().equals("newExpression")) {
             type1 = "i8*";
             arg1 = expression.getName();
+        }
+        else if(expression.getType().equals("boolean")) {
+            type1 = "i1";
+            if(expression.getName().equals("false"))
+                arg1 = "0";
+            else
+                arg1 = "1";
         }
         else{
             type1 = "i32";
@@ -1173,29 +1174,48 @@ public class Translator extends GJDepthFirst<Info, Info> {
     public Info visit(IntegerArrayAllocationExpression n, Info argu) {
         System.out.println("IntegerArrayAllocationExpression starts");
 
-        int size;
-        String arraySize;
+        String arraySize = null;
         String okLabel, errorLabel;
         String[] tempVariables;
         FieldInfo expression = null;
         VariableType variableType;
-
-        tempVariables = new String[4];
-        for(int i = 0; i < 4; i++)
-            tempVariables[i] = getTempVariable();
 
         okLabel = "nsz_ok_" + arrayCounter;
         errorLabel = "nsz_err_" + arrayCounter;
 
         expression = (FieldInfo)n.f3.accept(this, null);
 
-        if(expression.getName().equals("identifier"))
+        if(expression.getType().equals("identifier")) {
             variableType = findLocation(expression);
+            expression = variableType.getVariable();
 
-        arraySize = expression.getName();
-        size = Integer.parseInt(arraySize);
+            if(variableType.getType().equals("local")) {
 
-        System.out.println("Array size: " + size);
+                // Loading the value that's stored in the expression
+                arraySize = getTempVariable();
+                writeOutput("\t" + arraySize + " = load i32, i32* " + expression.getRegName() + "\n");
+            }
+            else {
+                // Getting a pointer to the field
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (expression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " = bitcast i8* to i32*\n");
+
+                // Loading the value
+                arraySize = getTempVariable();
+                writeOutput("\t" + arraySize + " = load i32, i32* " + bitcast + "\n");
+            }
+
+        }
+        else if(expression.getType().equals("int"))
+            arraySize = expression.getName();
+
+        tempVariables = new String[4];
+        for(int i = 0; i < 4; i++)
+            tempVariables[i] = getTempVariable();
 
         writeOutput("\t" + tempVariables[0] + " = add i32 1, " + arraySize + "\n");
         writeOutput("\t" + tempVariables[1] + " = icmp sge i32 " + tempVariables[0] + ", 1\n");
