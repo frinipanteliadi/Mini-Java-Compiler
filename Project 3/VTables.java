@@ -237,3 +237,21 @@ class Functions {
         }
     }
 }
+
+class VariableType {
+    FieldInfo variable;
+    String type;
+
+    public VariableType(FieldInfo variable, String type) {
+        setVariable(variable);
+        setType(type);
+    }
+
+    public void setVariable(FieldInfo variable) { this.variable = variable; }
+
+    public void setType(String type) { this.type = type; }
+
+    public FieldInfo getVariable() { return this.variable; }
+
+    public String getType() { return this.type; }
+}

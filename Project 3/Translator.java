@@ -50,22 +50,32 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
     }
 
-    public FieldInfo findLocation(FieldInfo value) {
+    // Locating an identifier
+    public VariableType findLocation(FieldInfo value) {
 
-        FieldInfo returnValue = null;
+        VariableType variableType;
+        variableType = new VariableType(null, null);
 
-        if(currentMethod.variableNameExists(value.getName()))
+        if(currentMethod.variableNameExists(value.getName())) {
             // Case 1: Local variable of the method
-            returnValue = currentMethod.getCertainVariable(value.getName());
-        else if(currentMethod.getOwner().fieldNameExists(value.getName()))
-            // Case 2: Field of the owning class
-            returnValue = currentMethod.getOwner().getCertainField(value.getName());
-        else if(currentMethod.getOwner().inheritedField(value.getName()))
-            // Case 3: Field of a super class
-            returnValue = currentMethod.getOwner().getInheritedField(value.getName());
+            variableType.setVariable(currentMethod.getCertainVariable(value.getName()));
+            variableType.setType("local");
+        }
+        else if(currentMethod.getOwner().fieldNameExists(value.getName())) {
+            // Case 2: Field of the class that owns the method
+            variableType.setVariable(currentMethod.getOwner().getCertainField(value.getName()));
+            variableType.setType("parent");
+        }
+        else if(currentMethod.getOwner().inheritedField(value.getName())) {
+            // Case 3: Field of a super class of the class that owns the method
+            variableType.setVariable(currentMethod.getOwner().getInheritedField(value.getName()));
+            variableType.setType("super");
+        }
 
-        return returnValue;
+        return variableType;
     }
+
+    public String getTempVariable() { return ("%_" + registers++); }
 
     /**
      * f0 -> "class"
@@ -190,11 +200,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
 
             // Loading the address of the array
-            registerNames[0] = "%_" + registers++;
+            registerNames[0] = getTempVariable();
             writeOutput("\t" + registerNames[0] + " = load " + type + ", " + type + "* " + identifier.getRegName() + "\n");
 
             // Loading the size of the array
-            registerNames[1] = "%_" + registers++;
+            registerNames[1] = getTempVariable();
             writeOutput("\t" + registerNames[1] + " = load i32, " + type + " " + registerNames[0] + "\n");
         }
         else if(currentMethod.getOwner().fieldNameExists(identifier.getName())) {
@@ -207,17 +217,17 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
 
         if(expression.getType().equals("int")) {
-            registerNames[2] = "%_" + registers++;
+            registerNames[2] = getTempVariable();
 
             // Checking tha the index is greater than zero
             writeOutput("\t" + registerNames[2] + " = icmp sge i32 " + expression.getName() + ", 0\n");
 
             // Checking that the index is less than the size of the array
-            registerNames[3] = "%_" + registers++;
+            registerNames[3] = getTempVariable();
             writeOutput("\t" +  registerNames[3] + " = icmp slt i32 " + expression.getName() + ", " + registerNames[1] + "\n");
 
             // Both of the previous conditions must hold
-            registerNames[4] = "%_" + registers++; // %_8
+            registerNames[4] = getTempVariable(); // %_8
             writeOutput("\t" + registerNames[4] + " = and i1 " + registerNames[2] + ", " + registerNames[3] + "\n");
             writeOutput("\tbr i1 " + registerNames[4] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
 
@@ -229,11 +239,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
             writeOutput("\t" + okLabel + ":\n");
 
             // Add one to the index, since the first element holds the size
-            registerNames[5] = "%_" + registers++;
+            registerNames[5] = getTempVariable();
             writeOutput("\t" + registerNames[5] + " = add i32 1, " + expression.getName() + "\n");
 
             // Get a pointer to the i+1 element of the array
-            registerNames[6] = "%_" + registers++;
+            registerNames[6] = getTempVariable();
             writeOutput("\t" + registerNames[6] + " = getelementptr i32, i32* " + registerNames[0]);
             writeOutput(", i32 " + registerNames[5] + "\n");
 
@@ -440,17 +450,14 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 returnStatement = currentMethod.getOwner().getCertainField(returnStatement.getName());
 
                 // Getting a pointer to the data field
-                String ptr = "%_" + registers;
-                registers++;
+                String ptr = getTempVariable();
                 writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (returnStatement.getOffset()+8) + "\n");
 
                 // Performing the necassary bitcasts
-                String temp = "%_" + registers;
-                registers++;
+                String temp = getTempVariable();
                 writeOutput("\t" + temp + " = bitcast i8* " + ptr + " to " + vTables.setType(returnStatement.getType()) + "*\n");
 
-                returnRegister = "%_" + registers;
-                registers++;
+                returnRegister = getTempVariable();
                 writeOutput("\t" + returnRegister + " load " + vTables.setType(returnStatement.getType()) + ", ");
                 writeOutput(vTables.setType(returnStatement.getType()) + "* " + temp + "\n\n");
 
@@ -460,22 +467,19 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Case 3: Field of a super class
                 returnStatement = currentMethod.getOwner().getInheritedField(returnStatement.getName());
 
-                registerNames[0] = "%_" + registers;
-                registers++;
+                registerNames[0] = getTempVariable();
 
                 writeOutput("\t" + registerNames[0] + " = getelementptr i8, i8* %this, ");
                 writeOutput("i32 " + (returnStatement.getOffset() + 8) + "\n");
 
-                registerNames[1] = "%_" + registers;
-                registers++;
+                registerNames[1] = getTempVariable();
 
                 type = vTables.setType(returnStatement.getType());
 
                 writeOutput("\t" + registerNames[1] + " = bitcast i8* " + registerNames[0] + " to ");
                 writeOutput(type + "*\n");
 
-                returnRegister = "%_" + registers;
-                registers++;
+                returnRegister = getTempVariable();
 
                 writeOutput("\t" + returnRegister + " = load " + type + ", " + type + "* " + registerNames[1] + "\n\n");
             }
@@ -521,8 +525,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Case 1: Local variable of the method
                 expression = currentMethod.getCertainVariable(identifierName);
                 type = vTables.setType(expression.getType());
-                registerName = "%_" + registers;
-                registers++;
+                registerName = getTempVariable();
                 writeOutput("\t" + registerName + " = load " + type + ", " + type + "* " + expression.getRegName() + "\n");
 
                 writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
@@ -532,13 +535,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 expression = currentMethod.getOwner().getCertainField(identifierName);
 
                 // Getting a pointer to the field
-                String ptr = "%_" + registers;
-                registers++;
+                String ptr = getTempVariable();
                 writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (expression.getOffset()+8) + "\n");
 
                 // Performing the necessary bitcasts
-                registerName = "%_" + registers;
-                registers++;
+                registerName = getTempVariable();
                 writeOutput("\t" + registerName + " = bitcast i8* " + ptr + " to " + vTables.setType(expression.getType()) + "*\n");
                 writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
 
@@ -549,13 +550,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 expression = currentMethod.getOwner().getInheritedField(identifierName);
 
                 // Getting a pointer to the field
-                String ptr = "%_" + registers;
-                registers++;
+                String ptr = getTempVariable();
                 writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (expression.getOffset()+8) + "\n");
 
                 // Performing the necessary bitcasts
-                registerName = "%_" + registers;
-                registers++;
+                registerName = getTempVariable();
                 writeOutput("\t" + registerName + " = bitcast i8* " + ptr + " to " + vTables.setType(expression.getType()) + "*\n");
                 writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
             }
@@ -585,119 +584,65 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         System.out.println("AssignmentStatement starts");
 
-        int flag = 0;
-        String arg1 = null;
-        String arg2 = null;
-        String type1 = null;
-        String type2 = null;
         FieldInfo identifier;
         FieldInfo expression;
+        VariableType variableType;
+        String type1 = null, arg1 = null, type2 = null, arg2 = null;
 
-        identifier = (FieldInfo)n.f0.accept(this, null);
+        // Getting the expression
         expression = (FieldInfo)n.f2.accept(this, null);
-        if(expression == null)
-            return null;
 
-        if(expression.getType().equals("int")) {
-            type1 = "i32";
-            arg1 = expression.getName();
-        }
-        else if(expression.getType().equals("identifier")) {
-            if(currentMethod.variableNameExists(expression.getName())) {
-                // Case 1: Local variable of the method
-                expression = currentMethod.getCertainVariable(expression.getName());
+        if(expression.getType().equals("identifier")) {
+            variableType = findLocation(expression);
+            expression = variableType.getVariable();
+
+            if(variableType.getType().equals("local")) {
+
+                // Loading the local variable
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = load " + vTables.setType(expression.getType()));
+                writeOutput(", " + vTables.setType(expression.getType()) + "* ");
+                writeOutput(expression.getRegName() + "\n");
+
                 type1 = vTables.setType(expression.getType());
-                arg1 = "%_" + registers;
-                registers++;
+                arg1 = ptr;
+            }
 
-                writeOutput("\t" + arg1 + " = load " + type1 + ", " + type1 + "* " + expression.getRegName() + "\n");
-            }
-            else if(currentMethod.getOwner().fieldNameExists(expression.getName())) {
-                // Case 2: Field of the owning class
-                expression = currentMethod.getOwner().getCertainField(expression.getName());
-            }
-            else if(currentMethod.getOwner().inheritedField(expression.getName())) {
-                // Case 3: Field of a super class
-                expression = currentMethod.getOwner().getInheritedField(expression.getName());
-            }
-        }
-        else if(expression.getType().equals("newExpression"))
-            flag = 1;
-        else if(expression.getType().equals("mult")) {
-            type1 = "i32";
-            arg1 = expression.getName();
-        }
-        else if(expression.getType().equals("boolean")) {
-            type1 = "i1";
-            if(expression.getName() == "false")
-                arg1 = "0";
-            else
-                arg1 = "1";
-        }
-        else if(expression.getType().equals("messageSend")) {
-            arg1 = expression.getName();
-            flag = 2;
-        }
-        else if(expression.getType().equals("andExpr")) {
-            arg1 = expression.getName();
-            type1 = "i1";
         }
         else if(expression.getType().equals("newIntArrayExpr")) {
-            arg1 = expression.getName();
             type1 = "i32*";
+            arg1 = expression.getName();
+        }
+        else if(expression.getType().equals("newExpression")) {
+            type1 = "i8*";
+            arg1 = expression.getName();
+        }
+        else{
+            type1 = "i32";
+            arg1 = expression.getName();
         }
 
-        // ** Locating the identifier **
-        if(identifier.getType().equals("identifier")) {
-            if(currentMethod.variableNameExists(identifier.getName())) {
-                // Case 1: Local variable of the method
-                identifier = currentMethod.getCertainVariable(identifier.getName());
-                type2 = vTables.setType(identifier.getType());
-                arg2 = identifier.getRegName();
-            }
-            else if(currentMethod.getOwner().fieldNameExists(identifier.getName())) {
-                // Case 2: Field of the owning class
-                identifier = currentMethod.getOwner().getCertainField(identifier.getName());
+        // Getting the identifier
+        identifier = (FieldInfo)n.f0.accept(this, null);
+        variableType = findLocation(identifier);
+        identifier = variableType.getVariable();
 
-                String registerName;
-                registerName= "%_" + registers;
-                registers++;
+        if(!variableType.getType().equals("local")) {
+            // Getting a pointer to the field of the class
+            String ptr = getTempVariable();
+            writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (identifier.getOffset() + 8) + "\n");
 
-                writeOutput("\t" + registerName + " = getelementptr i8, i8* %this, i32 " + (identifier.getOffset() + 8) + "\n");
+            type2 = vTables.setType(identifier.getType()) + "*"; // Pointer to the identifier
+            arg2 = getTempVariable();
 
-                type2 = vTables.setType(identifier.getType());
-                arg2 = "%_" + registers;
-                registers++;
-
-                writeOutput("\t" + arg2 + " = bitcast i8* " + registerName + " to " + type2 + "*\n");
-            }
-            else if(currentMethod.getOwner().inheritedField(identifier.getName())) {
-                // Case 3: Field of a super class
-                identifier = currentMethod.getOwner().getInheritedField(identifier.getName());
-
-                String registerName;
-                registerName = "%_" + registers;
-                registers++;
-
-                writeOutput("\t" + registerName + " = getelementptr i8, i8* %this, i32 " + (identifier.getOffset() + 8) + "\n");
-
-                type2 = vTables.setType(identifier.getType());
-                arg2 = "%_" + registers;
-                registers++;
-
-                writeOutput("\t" + arg2 + " = bitcast i8* " + registerName + " to " + type2 + "*\n");
-            }
+            writeOutput("\t" + arg2 + " = bitcast i8* " + ptr + " to " + type2 + "\n");
+        }
+        else {
+            type2 = vTables.setType(identifier.getType()) + "*"; // Pointer to the identifier
+            arg2 = identifier.getRegName();
         }
 
-        if(flag == 1) {
-            writeOutput(identifier.getRegName() + "\n\n");
-            return null;
-        }
-        else if(flag == 2){
-            type1 = type2;
-        }
-
-        writeOutput("\tstore " + type1 + " " + arg1 + ", " + type2 + "* " + arg2 + "\n\n");
+        writeOutput("\tstore " + type1 + " " + arg1 + ", " + type2 + " " + arg2 + "\n\n");
 
         System.out.println("AssignmentStatement ends");
         return null;
@@ -729,6 +674,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
     public Info visit(PlusExpression n, Info argu) {
         System.out.println("PlusExpression starts");
 
+        VariableType variableType;
         FieldInfo firstPrimaryExpression;
         FieldInfo secondPrimaryExpression;
         String addend_1 = null, addend_2 = null, sum = null;
@@ -737,43 +683,27 @@ public class Translator extends GJDepthFirst<Info, Info> {
         secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
 
         if(firstPrimaryExpression.getType().equals("identifier")) {
-            if(currentMethod.variableNameExists(firstPrimaryExpression.getName())) {
-                // Case 1: Local variable of the method
-                firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
+            variableType = findLocation(firstPrimaryExpression);
+            firstPrimaryExpression = variableType.getVariable();
 
-                addend_1 = "%_" + registers++;
+            if(variableType.getType().equals("local")) {
+                addend_1 = getTempVariable();
+                String type = vTables.setType(firstPrimaryExpression.getType());
 
-                writeOutput("\t" + addend_1 + " = load " + vTables.setType(firstPrimaryExpression.getType()));
-                writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
+                writeOutput("\t" + addend_1 + " = load " + type + ", " + type + "* ");
                 writeOutput(firstPrimaryExpression.getRegName() + "\n");
             }
-            else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
-                // Case 2: Field of the owning class
-                firstPrimaryExpression = currentMethod.getOwner().getCertainField(firstPrimaryExpression.getName());
-
-                // Getting a pointer to the data field
-                String ptr = "%_" + registers++;
+            else {
+                // Getting a pointer to the field
+                String ptr = getTempVariable();
                 writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
 
                 // Performing the necessary bitcasts
-                String bitcast = "%_" + registers++;
+                String bitcast = getTempVariable();
                 writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
 
-                addend_1 = "%_" + registers++;
-                writeOutput("\t" + addend_1 + " = load i32, i32* " + bitcast + "\n");
-            }
-            else if(currentMethod.getOwner().inheritedField(firstPrimaryExpression.getName())) {
-                firstPrimaryExpression = currentMethod.getOwner().getInheritedField(firstPrimaryExpression.getName());
-
-                // Getting a pointer to the data field
-                String ptr = "%_" + registers++;
-                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
-
-                // Performing the necessary bitcasts
-                String bitcast = "%_" + registers++;
-                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
-
-                addend_1 = "%_" + registers++;
+                // Loading the value
+                addend_1 = getTempVariable();
                 writeOutput("\t" + addend_1 + " = load i32, i32* " + bitcast + "\n");
             }
         }
@@ -781,51 +711,34 @@ public class Translator extends GJDepthFirst<Info, Info> {
             addend_1 = firstPrimaryExpression.getName();
 
         if(secondPrimaryExpression.getType().equals("identifier")) {
-            if(currentMethod.variableNameExists(secondPrimaryExpression.getName())) {
-                // Case 1: Local variable of the method
-                secondPrimaryExpression = currentMethod.getCertainVariable(secondPrimaryExpression.getName());
+            variableType = findLocation(secondPrimaryExpression);
+            secondPrimaryExpression = variableType.getVariable();
 
-                addend_2 = "%_" + registers++;
-
-                writeOutput("\t" + addend_2 + " = load " + vTables.setType(secondPrimaryExpression.getType()));
-                writeOutput(", " + vTables.setType(secondPrimaryExpression.getType()) + "* ");
+            if(variableType.getType().equals("local")) {
+                addend_2 = getTempVariable();
+                String type = vTables.setType(secondPrimaryExpression.getType());
+                writeOutput("\t" + addend_2 + " = load " + type);
+                writeOutput(", " + type + "* ");
                 writeOutput(secondPrimaryExpression.getRegName() + "\n");
             }
-            else if(currentMethod.getOwner().fieldNameExists(secondPrimaryExpression.getName())) {
-                // Case 2: Field of the owning class
-                secondPrimaryExpression = currentMethod.getOwner().getCertainField(secondPrimaryExpression.getName());
-
-                // Getting a pointer to the data field
-                String ptr = "%_" + registers++;
+            else {
+                // Getting a pointer to the field
+                String ptr = getTempVariable();
                 writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
 
                 // Performing the necessary bitcasts
-                String bitcast = "%_" + registers++;
+                String bitcast = getTempVariable();
                 writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
 
-                addend_2 = "%_" + registers++;
-                writeOutput("\t" + addend_2 + " = load i32, i32* " + bitcast + "\n");
-            }
-            else if(currentMethod.getOwner().inheritedField(secondPrimaryExpression.getName())) {
-                // Case 3: Field of a super class
-                secondPrimaryExpression = currentMethod.getOwner().getInheritedField(secondPrimaryExpression.getName());
-
-                // Getting a pointer to the data field
-                String ptr = "%_" + registers++;
-                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
-
-                // Performing the necessary bitcasts
-                String bitcast = "%_" + registers++;
-                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
-
-                addend_2 = "%_" + registers++;
+                // Loading the value
+                addend_2 = getTempVariable();
                 writeOutput("\t" + addend_2 + " = load i32, i32* " + bitcast + "\n");
             }
         }
         else if(secondPrimaryExpression.getType().equals("int"))
             addend_2 = secondPrimaryExpression.getName();
 
-        sum = "%_" + registers++;
+        sum = getTempVariable();
         writeOutput("\t" + sum + " = add i32 " + addend_1 + ", " + addend_2 + "\n");
 
         return new FieldInfo("add", sum, -1, false);
@@ -838,6 +751,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(MinusExpression n, Info argu) {
 
+        VariableType variableType;
         FieldInfo firstPrimaryExpression;
         FieldInfo secondPrimaryExpression;
         String minuend = null, subtrahend = null, difference = null;
@@ -846,95 +760,61 @@ public class Translator extends GJDepthFirst<Info, Info> {
         secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
 
         if(firstPrimaryExpression.getType().equals("identifier")) {
-            if(currentMethod.variableNameExists(firstPrimaryExpression.getName())) {
-                // Case 1: Local variable of the method
-                firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
 
-                minuend = "%_" + registers++;
+            variableType = findLocation(firstPrimaryExpression);
+            firstPrimaryExpression = variableType.getVariable();
+
+            if(variableType.getType().equals("local")) {
+
+                minuend = getTempVariable();
 
                 writeOutput("\t" + minuend + " = load " + vTables.setType(firstPrimaryExpression.getType()));
                 writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
                 writeOutput(firstPrimaryExpression.getRegName() + "\n");
             }
-            else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
-                // Case 2: Field of the owning class
-                firstPrimaryExpression = currentMethod.getOwner().getCertainField(firstPrimaryExpression.getName());
-
-                // Getting a pointer to the data field
-                String ptr = "%_" + registers++;
+            else {
+                // Getting a pointer to the field
+                String ptr = getTempVariable();
                 writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
 
                 // Performing the necessary bitcasts
-                String bitcast = "%_" + registers++;
+                String bitcast = getTempVariable();
                 writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
 
-                minuend = "%_" + registers++;
-                writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
-            }
-            else if(currentMethod.getOwner().inheritedField(firstPrimaryExpression.getName())) {
-                firstPrimaryExpression = currentMethod.getOwner().getInheritedField(firstPrimaryExpression.getName());
-
-                // Getting a pointer to the data field
-                String ptr = "%_" + registers++;
-                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
-
-                // Performing the necessary bitcasts
-                String bitcast = "%_" + registers++;
-                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
-
-                minuend = "%_" + registers++;
-                writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
+                minuend = getTempVariable();
+                writeOutput("\t" + minuend + " = load i32, i32* " + bitcast + "*\n");
             }
         }
         else if(firstPrimaryExpression.getType().equals("int"))
             minuend = firstPrimaryExpression.getName();
 
         if(secondPrimaryExpression.getType().equals("identifier")) {
-            if(currentMethod.variableNameExists(secondPrimaryExpression.getName())) {
-                // Case 1: Local variable of the method
-                secondPrimaryExpression = currentMethod.getCertainVariable(secondPrimaryExpression.getName());
+            variableType = findLocation(secondPrimaryExpression);
+            secondPrimaryExpression = variableType.getVariable();
 
-                subtrahend = "%_" + registers++;
-
+            if(variableType.getType().equals("local")) {
+                subtrahend = getTempVariable();
                 writeOutput("\t" + subtrahend + " = load " + vTables.setType(secondPrimaryExpression.getType()));
                 writeOutput(", " + vTables.setType(secondPrimaryExpression.getType()) + "* ");
                 writeOutput(secondPrimaryExpression.getRegName() + "\n");
             }
-            else if(currentMethod.getOwner().fieldNameExists(secondPrimaryExpression.getName())) {
-                // Case 2: Field of the owning class
-                secondPrimaryExpression = currentMethod.getOwner().getCertainField(secondPrimaryExpression.getName());
-
-                // Getting a pointer to the data field
-                String ptr = "%_" + registers++;
+            else {
+                // Getting a pointer to the field
+                String ptr = getTempVariable();
                 writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
 
                 // Performing the necessary bitcasts
-                String bitcast = "%_" + registers++;
+                String bitcast = getTempVariable();
                 writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
 
-                subtrahend = "%_" + registers++;
-                writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
-            }
-            else if(currentMethod.getOwner().inheritedField(secondPrimaryExpression.getName())) {
-                // Case 3: Field of a super class
-                secondPrimaryExpression = currentMethod.getOwner().getInheritedField(secondPrimaryExpression.getName());
-
-                // Getting a pointer to the data field
-                String ptr = "%_" + registers++;
-                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
-
-                // Performing the necessary bitcasts
-                String bitcast = "%_" + registers++;
-                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
-
-                subtrahend = "%_" + registers++;
+                subtrahend = getTempVariable();
                 writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
             }
         }
         else if(secondPrimaryExpression.getType().equals("int"))
             subtrahend = secondPrimaryExpression.getName();
 
-        difference = "%_" + registers++;
+        difference = getTempVariable();
         writeOutput("\t" + difference + " = sub i32 " + minuend + ", " + subtrahend + "\n");
 
         return new FieldInfo("sub", difference, -1, false);
@@ -962,7 +842,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Case 1: Local variable of the method
                 firstClause = currentMethod.getCertainVariable(firstClause.getName());
 
-                left = "%_" + registers++;
+                left = getTempVariable();
                 writeOutput("\t" + left + " = load i1, i1* " + firstClause.getRegName() + "\n");
             }
         }
@@ -985,7 +865,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Case 1: Local variable of the method
                 secondClause = currentMethod.getCertainVariable(secondClause.getName());
 
-                right = "%_" + registers++;
+                right = getTempVariable();
                 writeOutput("\t" + right + " = load i1, i1* " + secondClause.getRegName() + "\n\n");
             }
         }
@@ -997,7 +877,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\tbr label %" + label_3 + "\n\n");
 
         writeOutput("\t" + label_3 + ":\n");
-        result = "%_" + registers++;
+        result = getTempVariable();
         writeOutput("\t" + result + " = phi i1 [0, %" + label_0 + "], ");
         writeOutput("[" + right + ", %" + label_2 + "]\n\n");
 
@@ -1027,8 +907,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Case 1: Local variable of the method
                 firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
 
-                left = "%_" + registers;
-                registers++;
+                left = getTempVariable();
 
                 writeOutput("\t" + left + " = load " + vTables.setType(firstPrimaryExpression.getType()));
                 writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
@@ -1048,8 +927,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         if(secondPrimaryExpression.getType().equals("int"))
             right = secondPrimaryExpression.getName();
 
-        result = "%_" + registers;
-        registers++;
+        result = getTempVariable();
 
         writeOutput("\t" + result + " = icmp slt i32 " + left + ", " + right + "\n");
 
@@ -1065,39 +943,45 @@ public class Translator extends GJDepthFirst<Info, Info> {
     public Info visit(TimesExpression n, Info argu) {
         System.out.println("TimesExpression starts");
 
+        VariableType variableType;
         FieldInfo firstPrimaryExpression;
         FieldInfo secondPrimaryExpression;
-        String factor_1 = null, factor_2 = null, product = null;
+        String factor_1 = null, factor_2 = null, product;
 
         firstPrimaryExpression = (FieldInfo)n.f0.accept(this, null);
         secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
 
         if(firstPrimaryExpression.getType().equals("identifier")) {
-            // ** Locating the identifier **
-            if(currentMethod.variableNameExists(firstPrimaryExpression.getName())) {
-                // Case 1: Local variable of the method
-                firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
-            }
-            else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
-                // Case 2: Field of the owning class
-                firstPrimaryExpression = currentMethod.getOwner().getCertainField(firstPrimaryExpression.getName());
-            }
-            else if(currentMethod.getOwner().inheritedField(firstPrimaryExpression.getName())) {
-                // Case 3: Field of a super class
-                firstPrimaryExpression = currentMethod.getOwner().getInheritedField(firstPrimaryExpression.getName());
-            }
+            variableType = findLocation(firstPrimaryExpression);
+            firstPrimaryExpression = variableType.getVariable();
 
-            factor_1 = "%_" + registers;
-            registers++;
+            if(variableType.getType().equals("local")) {
+                factor_1 = getTempVariable();
+                String type = vTables.setType(firstPrimaryExpression.getType());
 
-            writeOutput("\t" + factor_1 + " = load i32, i32* " + firstPrimaryExpression.getRegName() + "\n");
+                writeOutput("\t" + factor_1 + " = load " + type + ", ");
+                writeOutput(type + "* " + firstPrimaryExpression.getRegName() + "\n");
+            }
+            else {
+                // Getting a pointer to the field
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + vTables.setType(firstPrimaryExpression.getType()) + "*\n");
+
+                factor_1 = getTempVariable();
+                writeOutput("\t" + factor_1 + " = load i32, i32* " + bitcast + "\n");
+            }
         }
+        else if(firstPrimaryExpression.getType().equals("int"))
+            factor_1 = firstPrimaryExpression.getName();
 
         if(secondPrimaryExpression.getType().equals("int"))
             factor_2 = secondPrimaryExpression.getName();
 
-        product = "%_" + registers;
-        registers++;
+        product = getTempVariable();
 
         writeOutput("\t" + product + " = mul i32 " + factor_1 + ", " + factor_2 + "\n\n");
 
@@ -1137,18 +1021,15 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 primaryExpression = currentMethod.getCertainVariable(primaryExpression.getName());
 
                 // Load the object pointer
-                registerName[0] = "%_" + registers;
-                registers++;
+                registerName[0] = getTempVariable();
                 writeOutput("\t" + registerName[0] + " = load i8*, i8** " + primaryExpression.getRegName() + "\n\n");
 
                 // Doing the required bitcasts so that we can access the v-table
-                registerName[1] = "%_" + registers;
-                registers++;
+                registerName[1] = getTempVariable();
                 writeOutput("\t" + registerName[1] + " = bitcast i8* " + registerName[0] + " to i8***\n\n");
 
                 // Loading the v-table pointer
-                registerName[2] = "%_" + registers;
-                registers++;
+                registerName[2] = getTempVariable();
                 writeOutput("\t" + registerName[2] + " = load i8**, i8*** " + registerName[1] + "\n\n");
 
                 // Getting the name of the method that's being called
@@ -1163,18 +1044,15 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 index = calledMethod.getOffset();
 
                 // Getting a pointer to the first entry of the v-table
-                registerName[3] = "%_" + registers;
-                registers++;
+                registerName[3] = getTempVariable();
                 writeOutput("\t" + registerName[3] + " = getelementptr i8*, i8** " + registerName[2] + ", i32 " + index + "\n");
 
                 // Getting the actual function pointer
-                registerName[4] = "%_" + registers;
-                registers++;
+                registerName[4] = getTempVariable();
                 writeOutput("\t" + registerName[4] + " = load i8*, i8** " + registerName[3] + "\n");
 
                 // Casting the function pointer from i8* to a function ptr type that matches its signature
-                registerName[5] = "%_" + registers;
-                registers++;
+                registerName[5] = getTempVariable();
                 type = vTables.setType(calledMethod.getReturnType());
                 writeOutput("\t" + registerName[5] + " = bitcast i8* " + registerName[4] + " to " + type);
                 writeOutput(" (i8*");
@@ -1188,8 +1066,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 if(n.f4.present()) {
                     n.f4.accept(this, null);
 
-                    registerName[6] = "%_" + registers;
-                    registers++;
+                    registerName[6] = getTempVariable();
                     type = vTables.setType(calledMethod.getReturnType());
                     writeOutput("\t" + registerName[6] + " = call " + type + " " + registerName[5] + "(i8* " + registerName[0]);
 
@@ -1296,54 +1173,45 @@ public class Translator extends GJDepthFirst<Info, Info> {
     public Info visit(IntegerArrayAllocationExpression n, Info argu) {
         System.out.println("IntegerArrayAllocationExpression starts");
 
-        FieldInfo expression;
-        String result = null;
+        int size;
+        String arraySize;
         String okLabel, errorLabel;
-        String[] registerNames;
+        String[] tempVariables;
+        FieldInfo expression = null;
+        VariableType variableType;
+
+        tempVariables = new String[4];
+        for(int i = 0; i < 4; i++)
+            tempVariables[i] = getTempVariable();
 
         okLabel = "nsz_ok_" + arrayCounter;
         errorLabel = "nsz_err_" + arrayCounter;
 
         expression = (FieldInfo)n.f3.accept(this, null);
 
-        if(expression.getType().equals("int")) {
+        if(expression.getName().equals("identifier"))
+            variableType = findLocation(expression);
 
-            registerNames = new String[4];
+        arraySize = expression.getName();
+        size = Integer.parseInt(arraySize);
 
-            registerNames[0] = "%_" + registers++;
+        System.out.println("Array size: " + size);
 
-            // Calculating the size of the array
-            writeOutput("\t" + registerNames[0] + " = add i32 1, " + expression.getName() + "\n");
+        writeOutput("\t" + tempVariables[0] + " = add i32 1, " + arraySize + "\n");
+        writeOutput("\t" + tempVariables[1] + " = icmp sge i32 " + tempVariables[0] + ", 1\n");
+        writeOutput("\tbr i1 " + tempVariables[1] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
 
-            // Checking that the size of the array is ≥ 1
-            registerNames[1] = "%_" + registers++;
-            writeOutput("\t" + registerNames[1] + " = icmp sge i32 " + registerNames[0] + ", 1\n");
-            writeOutput("\tbr i1 " + registerNames[1] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
+        writeOutput("\t" + errorLabel + ":\n");
+        writeOutput("\tcall void @throw_nsz()\n");
+        writeOutput("\tbr label %" + okLabel + "\n\n");
 
-            // If the size is negative, throw a negative size exception
-            writeOutput("\t" + errorLabel + ":\n");
-            writeOutput("\tcall void @throw_nsz()\n\tbr label %" + okLabel + "\n\n");
-
-            // Since everything is ok, we're proceeding to the allocation
-            writeOutput("\t" + okLabel + ":\n");
-
-            registerNames[2] = "%_" + registers++;
-            registerNames[3] = "%_" + registers++;
-
-            // Allocating sz + 1 integers (4 bytes each)
-            writeOutput("\t" + registerNames[2] + " = call i8* @calloc(i32 " + registerNames[0] + ", i32 4)\n");
-
-            // Casting the pointer that was returned
-            writeOutput("\t" + registerNames[3] + " = bitcast i8* " + registerNames[2] + " to i32*\n");
-
-            // Storing the size of the array in the first position of the array
-            writeOutput("\tstore i32 " + expression.getName() + ", i32* " + registerNames[3] + "\n\n");
-
-            result = registerNames[3];
-        }
+        writeOutput("\t" + okLabel + ":\n");
+        writeOutput("\t" + tempVariables[2] + " = call i8* @calloc(i32 " + tempVariables[0] + ", i32 4)\n");
+        writeOutput("\t" + tempVariables[3] + " = bitcast i8* " + tempVariables[2] + " to i32*\n");
+        writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n\n");
 
         System.out.println("IntegerArrayAllocationExpression ends");
-        return new FieldInfo("newIntArrayExpr", result, -1, false);
+        return new FieldInfo("newIntArrayExpr", tempVariables[3], -1, false);
     }
 
     /**
@@ -1387,30 +1255,27 @@ public class Translator extends GJDepthFirst<Info, Info> {
         ClassInfo newClass;
 
         registerName = new String[3];
-        identifier = (FieldInfo) n.f1.accept(this, null);
+        identifier = (FieldInfo) n.f1.accept(this, null); // Name of a class
+
         newClass = symbolTable.getClass(identifier.getName());
 
         size = (newClass.getObjectSize()) + 8;
-        registerName[0] = "%_" + registers;
-        registers++;
+        registerName[0] = getTempVariable();
         writeOutput("\t" + registerName[0] + " = call i8* @calloc(i32 1, i32 " + size + ")\n");
 
-        registerName[1] = "%_" + registers;
-        registers++;
+        registerName[1] = getTempVariable();
         writeOutput("\t" + registerName[1] + " = bitcast i8* " + registerName[0] + " to i8***\n");
 
         pointersTableSize = vTables.getClassTables(identifier.getName()).getPointersTable().size();
-        registerName[2] = "%_" + registers;
-        registers++;
+        registerName[2] = getTempVariable();
         writeOutput("\t" + registerName[2] + " = getelementptr [" + pointersTableSize + " x i8*], [");
         writeOutput(pointersTableSize + " x i8*]* " + vTables.getClassTables(identifier.getName()).getVTableName());
         writeOutput(", i32 0, i32 0\n");
 
         writeOutput("\tstore i8** " + registerName[2] + ", i8*** " + registerName[1] + "\n");
-        writeOutput("\tstore i8* " + registerName[0] + ", i8** ");
 
         System.out.println("AllocationExpression ends");
-        return (new FieldInfo("newExpression", identifier.getName(), -1, false));
+        return (new FieldInfo("newExpression", registerName[0], -1, false));
     }
 
     /**
