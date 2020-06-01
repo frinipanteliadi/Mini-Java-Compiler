@@ -695,6 +695,110 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
     /**
      * f0 -> PrimaryExpression()
+     * f1 -> "["
+     * f2 -> PrimaryExpression()
+     * f3 -> "]"
+     */
+    public Info visit(ArrayLookup n, Info argu) {
+        System.out.println("ArrayLookup starts");
+
+        VariableType variableType;
+        String okLabel, errorLabel;
+        String[] tempVariables;
+        String arrayAddr = null, arraySize;
+        String index = null;
+        String registerName = null;
+        String value = null;
+        String type = null;
+        FieldInfo firstPrimaryExpression;
+        FieldInfo secondPrimaryExpression;
+
+        okLabel = "oob_ok_" + ArrayAssignmentCounter;
+        errorLabel = "oob_err_" + ArrayAssignmentCounter;
+        ArrayAssignmentCounter++;
+
+        firstPrimaryExpression = (FieldInfo)n.f0.accept(this, null);
+        secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
+
+        if(firstPrimaryExpression.getType().equals("identifier")) {
+            variableType = findLocation(firstPrimaryExpression);
+            firstPrimaryExpression = variableType.getVariable();
+            type = firstPrimaryExpression.getType();
+            if(type.equals("int[]"))
+                type = "int";
+            else
+                type = "boolean";
+            registerName = firstPrimaryExpression.getRegName();
+        }
+
+        // Loading the address of the array
+        arrayAddr = getTempVariable();
+        writeOutput("\t" + arrayAddr + " = load i32*, i32** " + registerName + "\n");
+
+        // Loading the size of the array
+        arraySize = getTempVariable();
+        writeOutput("\t" + arraySize + " = load i32, i32* " + arrayAddr + "\n");
+
+        if(secondPrimaryExpression.getType().equals("identifier")) {
+            variableType = findLocation(secondPrimaryExpression);
+            secondPrimaryExpression = variableType.getVariable();
+
+            if(variableType.getType().equals("local")) {
+                index = getTempVariable();
+                writeOutput("\t" + index + " = load i32, i32* " + secondPrimaryExpression.getRegName() + "\n");
+            }
+            else {
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
+
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " bitcast i8* " + ptr + " to i32*\n");
+
+                index = getTempVariable();
+                writeOutput("\t" + index + " = load i32, i32* " + bitcast + "\n");
+            }
+        }
+        else if(secondPrimaryExpression.getType().equals("int"))
+            index = secondPrimaryExpression.getName();
+
+        tempVariables = new String[5];
+        for(int i = 0; i < 5; i++)
+            tempVariables[i] = getTempVariable();
+
+        // Checking that the provided index is greater than zero
+        writeOutput("\t" + tempVariables[0] + " = icmp sge i32 " + index + ", 0\n");
+
+        // Checking that the index is less than the size of the array
+        writeOutput("\t" + tempVariables[1] + " = icmp slt i32 " + index + ", " + arraySize + '\n');
+
+        // Both of the above conditions must hold
+        writeOutput("\t" + tempVariables[2] + " = and i1 " + tempVariables[0] + ", " + tempVariables[1] + "\n");
+        writeOutput("\tbr i1 " + tempVariables[2] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
+
+        // If that's not the case, throw an out of bounds exception
+        writeOutput("\t" + errorLabel + ":\n");
+        writeOutput("\tcall void @throw_oob()\n");
+        writeOutput("\tbr label %" + okLabel + "\n\n");
+
+        // Everything's ok, moving on to indexing the array
+        writeOutput("\t" + okLabel + ":\n");
+
+        // Adding one to the index, since the first element holds the size
+        writeOutput("\t" + tempVariables[3] + " = add i32 1, " + index + "\n");
+
+        // Getting a pointer to the (i+1)th element of the array
+        writeOutput("\t" + tempVariables[4] + " = getelementptr i32, i32* " + arrayAddr + ", i32 " + tempVariables[3] + "\n");
+
+        // Loading the value
+        value = getTempVariable();
+        writeOutput("\t" + value + " = load i32, i32* " + tempVariables[4] + "\n\n");
+
+        System.out.println("ArrayLookup ends");
+        return new FieldInfo(/*"arrayLookUp"*/type, value, -1, false);
+    }
+
+    /**
+     * f0 -> PrimaryExpression()
      * f1 -> "+"
      * f2 -> PrimaryExpression()
      */
@@ -1199,6 +1303,20 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo primaryExpression = (FieldInfo) n.f0.accept(this, null);
         System.out.println("PrimaryExpression ends");
         return primaryExpression;
+    }
+
+    /**
+     * f0 -> "("
+     * f1 -> Expression()
+     * f2 -> ")"
+     */
+    public Info visit(BracketExpression n, Info argu) {
+        System.out.println("BracketExpression starts");
+
+        FieldInfo expression = (FieldInfo)n.f1.accept(this, null);
+
+        System.out.println("BracketExpression ends");
+        return expression;
     }
 
     /**
