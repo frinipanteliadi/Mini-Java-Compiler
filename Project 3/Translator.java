@@ -174,84 +174,109 @@ public class Translator extends GJDepthFirst<Info, Info> {
     public Info visit(ArrayAssignmentStatement n, Info argu) {
         System.out.println("ArrayAssignmentStatement starts");
 
-        String[] registerNames;
-        String type;
+        VariableType variableType;
         String okLabel, errorLabel;
+        String nszOkLabel, nszErrorLabel;
+        String arrayAddr, arraySize;
+        String index = null;
+        String value = null;
+        String[] tempVariables;
         FieldInfo identifier;
-        FieldInfo expression;
-        FieldInfo secondExpression;
-        String result = null;
+        FieldInfo firstExpression, secondExpression;
 
         okLabel = "oob_ok_" + ArrayAssignmentCounter;
         errorLabel = "oob_err_" + ArrayAssignmentCounter;
         ArrayAssignmentCounter++;
 
-        registerNames = new String[7];
-
         identifier = (FieldInfo)n.f0.accept(this, null);
-        expression = (FieldInfo)n.f2.accept(this, null);
+        variableType = findLocation(identifier);
+        identifier = variableType.getVariable();
+
+
+        // Loading the address of the array
+        arrayAddr = getTempVariable();
+        writeOutput("\t" + arrayAddr + " = load i32*, i32** " + identifier.getRegName() + "\n");
+
+        // Loading the size of the array
+        arraySize = getTempVariable();
+        writeOutput("\t" + arraySize + " = load i32, i32* " + arrayAddr + "\n");
+
+        firstExpression = (FieldInfo)n.f2.accept(this, null);
+        if(firstExpression.getType().equals("identifier")) {
+            variableType = findLocation(firstExpression);
+            firstExpression = variableType.getVariable();
+
+            if(variableType.getType().equals("local")) {
+                index = getTempVariable();
+                writeOutput("\t" + index + " = load i32, i32* " + firstExpression.getRegName() + "\n");
+            }
+            else {
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstExpression.getOffset() + 8) + "\n");
+
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " bitcast i8* " + ptr + " to i32*\n");
+
+                index = getTempVariable();
+                writeOutput("\t" + index + " = load i32, i32* " + bitcast + "\n");
+            }
+        }
+        else if(firstExpression.getType().equals("int"))
+            index = firstExpression.getName();
+
+        tempVariables = new String[5];
+        for(int i = 0; i < 5; i++)
+            tempVariables[i] = getTempVariable();
+
+        // Checking that the provided index is greater than zero
+        writeOutput("\t" + tempVariables[0] + " = icmp sge i32 " + index + ", 0\n");
+
+        // Checking that the index is less than the size of the array
+        writeOutput("\t" + tempVariables[1] + " = icmp slt i32 " + index + ", " + arraySize + '\n');
+
+        // Both of the above conditions must hold
+        writeOutput("\t" + tempVariables[2] + " = and i1 " + tempVariables[0] + ", " + tempVariables[1] + "\n");
+        writeOutput("\tbr i1 " + tempVariables[2] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
+
+        // If that's not the case, throw an out of bounds exception
+        writeOutput("\t" + errorLabel + ":\n");
+        writeOutput("\tcall void @throw_oob()\n");
+        writeOutput("\tbr label %" + okLabel + "\n\n");
+
         secondExpression = (FieldInfo)n.f5.accept(this, null);
+        if(secondExpression.getType().equals("identifier")) {
+            variableType = findLocation(secondExpression);
+            secondExpression = variableType.getVariable();
 
-        // ** Locating the identifier **
-        if(currentMethod.variableNameExists(identifier.getName())) {
-            // Case 1: Local variable of the method
-            identifier = currentMethod.getCertainVariable(identifier.getName());
-            type = vTables.setType(identifier.getType());
+            if(variableType.getType().equals("local")) {
+                value = getTempVariable();
+                writeOutput("\t" + value + " = load i32, i32* " + firstExpression.getRegName() + "\n");
+            }
+            else {
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstExpression.getOffset() + 8) + "\n");
 
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " bitcast i8* " + ptr + " to i32*\n");
 
-            // Loading the address of the array
-            registerNames[0] = getTempVariable();
-            writeOutput("\t" + registerNames[0] + " = load " + type + ", " + type + "* " + identifier.getRegName() + "\n");
-
-            // Loading the size of the array
-            registerNames[1] = getTempVariable();
-            writeOutput("\t" + registerNames[1] + " = load i32, " + type + " " + registerNames[0] + "\n");
+                value = getTempVariable();
+                writeOutput("\t" + value + " = load i32, i32* " + bitcast + "\n");
+            }
         }
-        else if(currentMethod.getOwner().fieldNameExists(identifier.getName())) {
-            // Case 2: Field of the owning class
-            identifier = currentMethod.getOwner().getCertainField(identifier.getName());
-        }
-        else if(currentMethod.getOwner().inheritedField(identifier.getName())) {
-            // Case 3: Field of a super class
-            identifier = currentMethod.getOwner().getInheritedField(identifier.getName());
-        }
+        else if(secondExpression.getType().equals("int"))
+            value = secondExpression.getName();
 
-        if(expression.getType().equals("int")) {
-            registerNames[2] = getTempVariable();
+        // Everything's ok, moving on to indexing the array
+        writeOutput("\t" + okLabel + ":\n");
 
-            // Checking tha the index is greater than zero
-            writeOutput("\t" + registerNames[2] + " = icmp sge i32 " + expression.getName() + ", 0\n");
+        // Adding one to the index, since the first element holds the size
+        writeOutput("\t" + tempVariables[3] + " = add i32 1, " + index + "\n");
 
-            // Checking that the index is less than the size of the array
-            registerNames[3] = getTempVariable();
-            writeOutput("\t" +  registerNames[3] + " = icmp slt i32 " + expression.getName() + ", " + registerNames[1] + "\n");
+        // Getting a pointer to the (i+1)th element of the array
+        writeOutput("\t" + tempVariables[4] + " = getelementptr i32, i32* " + arrayAddr + ", i32 " + tempVariables[3] + "\n");
 
-            // Both of the previous conditions must hold
-            registerNames[4] = getTempVariable(); // %_8
-            writeOutput("\t" + registerNames[4] + " = and i1 " + registerNames[2] + ", " + registerNames[3] + "\n");
-            writeOutput("\tbr i1 " + registerNames[4] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
-
-            // If not, throw an out of bounds exception
-            writeOutput("\t" + errorLabel + ":\n");
-            writeOutput("\tcall void @throw_oob()\n\tbr label %" + okLabel + "\n\n");
-
-            // If everything's ok, we can safely index the array
-            writeOutput("\t" + okLabel + ":\n");
-
-            // Add one to the index, since the first element holds the size
-            registerNames[5] = getTempVariable();
-            writeOutput("\t" + registerNames[5] + " = add i32 1, " + expression.getName() + "\n");
-
-            // Get a pointer to the i+1 element of the array
-            registerNames[6] = getTempVariable();
-            writeOutput("\t" + registerNames[6] + " = getelementptr i32, i32* " + registerNames[0]);
-            writeOutput(", i32 " + registerNames[5] + "\n");
-
-            result = registerNames[6];
-        }
-
-        if(secondExpression.getType().equals("int"))
-            writeOutput("\tstore i32 " + secondExpression.getName() + ", i32* " + result + "\n\n");
+        // Store the value to that address
+        writeOutput("\tstore i32 " + value + ", i32* " + tempVariables[4] + "\n\n");
 
         System.out.println("ArrayAssignmentStatement ends");
         return null;
