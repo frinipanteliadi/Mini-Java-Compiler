@@ -232,7 +232,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         variableType = findLocation(identifier);
         identifier = variableType.getVariable();
 
-
         // Loading the address of the array
         arrayAddr = getTempVariable();
         writeOutput("\t" + arrayAddr + " = load i32*, i32** " + identifier.getRegName() + "\n");
@@ -674,7 +673,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
             arg1 = expression.getName();
         }
         else if(expression.getType().equals("newBooleanArrayExpr")) {
-            type1 = "i1*";
+            type1 = "i8*";
             arg1 = expression.getName();
         }
         else if(expression.getType().equals("newExpression")) {
@@ -1426,10 +1425,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
             tempVariables[i] = getTempVariable();
 
         // Calculating arraySize bytes to be allocated for the array (new array[sz] -> add i32 1, sz
-        writeOutput("\t" + tempVariables[0] + " = add i32 1, " + arraySize + "\n");
+        writeOutput("\t" + tempVariables[0] + " = add i32 4, " + arraySize + "\n");
 
         // Checking the the size of the array is ≥ 1
-        writeOutput("\t" + tempVariables[1] + " = icmp sge i32 " + tempVariables[0] + ", 1\n");
+        writeOutput("\t" + tempVariables[1] + " = icmp sge i32 " + tempVariables[0] + ", 4\n");
         writeOutput("\tbr i1 " + tempVariables[1] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
 
         // If the size is negative, throw a negative size exception
@@ -1441,16 +1440,16 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\t" + okLabel + ":\n");
 
         // Allocating (arraySize + 1) integers (1 byte each)
-        writeOutput("\t" + tempVariables[2] + " = call i8* @calloc(i32 " + tempVariables[0] + ", i32 1)\n");
+        writeOutput("\t" + tempVariables[2] + " = call i8* @calloc(i32 1, i32 " + tempVariables[0] + ")\n");
 
         // Casting the pointer that was returned
         writeOutput("\t" + tempVariables[3] + " = bitcast i8* " + tempVariables[2] + " to i32*\n");
 
         // Storing the size of the array in the first position
-        writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n\n");
+        writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n");
 
         System.out.println("BooleanArrayAllocationExpression ends");
-        return new FieldInfo("newBooleanArrayExpr", tempVariables[3], -1, false);
+        return new FieldInfo("newBooleanArrayExpr", tempVariables[2], -1, false);
     }
 
     /**
