@@ -12,6 +12,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
     private int registers;
     private int arrayCounter;
     private int labelCounter;
+    private int whileLoopCounter;
     private int ArrayAssignmentCounter;
     private VTables vTables;
     private FileOutputStream out;
@@ -28,6 +29,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         registers = 0;
         arrayCounter = 0;
         labelCounter = 0;
+        whileLoopCounter = 0;
         ArrayAssignmentCounter = 0;
         this.vTables = vTables;
         out = vTables.getOutFile();
@@ -160,6 +162,45 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo statement = (FieldInfo)n.f0.accept(this, null);
         System.out.println("Statement ends");
         return statement;
+    }
+
+    /**
+     * f0 -> "while"
+     * f1 -> "("
+     * f2 -> Expression()
+     * f3 -> ")"
+     * f4 -> Statement()
+     */
+    public Info visit(WhileStatement n, Info argu) {
+        System.out.println("WhileStatement starts");
+
+        String[] labels;
+        FieldInfo expression, statement;
+
+        labels = new String[3];
+        for(int i = 0; i < 3; i++)
+            labels[i] = "loop" + whileLoopCounter++;
+
+        writeOutput("\tbr label %" + labels[0] + "\n\n");
+        writeOutput("\t" + labels[0] + ":\n");
+
+        // Checking if the expression is true
+        expression = (FieldInfo)n.f2.accept(this, null);
+        writeOutput("\tbr i1 " + expression.getName() + ", label %" + labels[1]);
+        writeOutput(", label %" + labels[2] + "\n\n");
+
+        // If the statement holds, execute the loop's statements
+        writeOutput("\t" + labels[1] + ":\n");
+        statement = (FieldInfo)n.f4.accept(this, null);
+
+        // Doing one more iteration
+        writeOutput("\tbr label %" + labels[0] + "\n\n");
+
+        // Leaving the loop
+        writeOutput("\t" + labels[2] + ":\n");
+
+        System.out.println("WhileStatement ends");
+        return null;
     }
 
     /**
