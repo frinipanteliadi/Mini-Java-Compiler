@@ -174,30 +174,29 @@ public class Translator extends GJDepthFirst<Info, Info> {
     public Info visit(WhileStatement n, Info argu) {
         System.out.println("WhileStatement starts");
 
-        String[] labels;
         FieldInfo expression, statement;
+        String condLabel, bodyLabel, exitLabel;
 
-        labels = new String[3];
-        for(int i = 0; i < 3; i++)
-            labels[i] = "loop" + whileLoopCounter++;
+        condLabel = "loop" + whileLoopCounter++;
+        bodyLabel = "loop" + whileLoopCounter++;
+        exitLabel = "loop" + whileLoopCounter++;
 
-        writeOutput("\tbr label %" + labels[0] + "\n\n");
-        writeOutput("\t" + labels[0] + ":\n");
+        // Go to the condition check
+        writeOutput("\tbr label %" + condLabel + "\n\n");
 
-        // Checking if the expression is true
+        // Checking the condition
+        writeOutput(condLabel + ":\n");
         expression = (FieldInfo)n.f2.accept(this, null);
-        writeOutput("\tbr i1 " + expression.getName() + ", label %" + labels[1]);
-        writeOutput(", label %" + labels[2] + "\n\n");
+        writeOutput("\tbr i1 " + expression.getName() + ", label %" + bodyLabel + ", label %" + exitLabel + "\n\n");
 
-        // If the statement holds, execute the loop's statements
-        writeOutput("\t" + labels[1] + ":\n");
+        // If the condition holds, we execute the loop's statements
+        // After that we check whether the condition again
+        writeOutput(bodyLabel + ":\n");
         statement = (FieldInfo)n.f4.accept(this, null);
+        writeOutput("\tbr label %" + condLabel + "\n\n");
 
-        // Doing one more iteration
-        writeOutput("\tbr label %" + labels[0] + "\n\n");
-
-        // Leaving the loop
-        writeOutput("\t" + labels[2] + ":\n");
+        // Ending the loop
+        writeOutput(exitLabel + ":\n");
 
         System.out.println("WhileStatement ends");
         return null;
@@ -280,9 +279,12 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\tbr i1 " + tempVariables[2] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
 
         // If that's not the case, throw an out of bounds exception
-        writeOutput("\t" + errorLabel + ":\n");
+        writeOutput(errorLabel + ":\n");
         writeOutput("\tcall void @throw_oob()\n");
         writeOutput("\tbr label %" + okLabel + "\n\n");
+
+        // Everything's ok, moving on to indexing the array
+        writeOutput(okLabel + ":\n");
 
         secondExpression = (FieldInfo)n.f5.accept(this, null);
         if(secondExpression.getType().equals("identifier")) {
@@ -306,9 +308,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(secondExpression.getType().equals("int"))
             value = secondExpression.getName();
-
-        // Everything's ok, moving on to indexing the array
-        writeOutput("\t" + okLabel + ":\n");
 
         // Adding one to the index, since the first element holds the size
         writeOutput("\t" + tempVariables[3] + " = add i32 1, " + index + "\n");
@@ -355,15 +354,15 @@ public class Translator extends GJDepthFirst<Info, Info> {
             writeOutput("label %" + elseLabel + "\n\n");
         }
 
-        writeOutput("\t" + elseLabel + ":\n");
+        writeOutput(elseLabel + ":\n");
         n.f6.accept(this, null);
         writeOutput("\tbr label %" + endLabel + "\n\n");
 
-        writeOutput("\t" + ifLabel + ":\n");
+        writeOutput(ifLabel + ":\n");
         n.f4.accept(this, null);
         writeOutput("\tbr label %" + endLabel + "\n\n");
 
-        writeOutput("\t" + endLabel + ":\n");
+        writeOutput(endLabel + ":\n");
 
         System.out.println("IfStatement ends");
         return null;
@@ -674,6 +673,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
             type1 = "i32*";
             arg1 = expression.getName();
         }
+        else if(expression.getType().equals("newBooleanArrayExpr")) {
+            type1 = "i1*";
+            arg1 = expression.getName();
+        }
         else if(expression.getType().equals("newExpression")) {
             type1 = "i8*";
             arg1 = expression.getName();
@@ -822,7 +825,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\tbr label %" + okLabel + "\n\n");
 
         // Everything's ok, moving on to indexing the array
-        writeOutput("\t" + okLabel + ":\n");
+        writeOutput(okLabel + ":\n");
 
         // Adding one to the index, since the first element holds the size
         writeOutput("\t" + tempVariables[3] + " = add i32 1, " + index + "\n");
@@ -1026,10 +1029,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         writeOutput("\tbr i1 " + left + ", label %" + label_1 + ", label %" + label_0 + "\n\n");
 
-        writeOutput("\t" + label_0 + ":\n");
+        writeOutput(label_0 + ":\n");
         writeOutput("\tbr label %" + label_2 + "\n\n");
 
-        writeOutput("\t" + label_1 + ":\n");
+        writeOutput(label_1 + ":\n");
         secondClause = (FieldInfo)n.f2.accept(this, null);
 
         if(secondClause.getType().equals("identifier")) {
@@ -1045,10 +1048,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\tbr label %" + label_2 + "\n\n");
 
 
-        writeOutput("\t" + label_2 + ":\n");
+        writeOutput(label_2 + ":\n");
         writeOutput("\tbr label %" + label_3 + "\n\n");
 
-        writeOutput("\t" + label_3 + ":\n");
+        writeOutput(label_3 + ":\n");
         result = getTempVariable();
         writeOutput("\t" + result + " = phi i1 [0, %" + label_0 + "], ");
         writeOutput("[" + right + ", %" + label_2 + "]\n\n");
@@ -1366,11 +1369,88 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(ArrayAllocationExpression n, Info argu) {
         System.out.println("ArrayAllocationExpression starts");
-
         FieldInfo arrayAllocationExpression = (FieldInfo)n.f0.accept(this, null);
-
         System.out.println("ArrayAllocationExpression ends");
         return arrayAllocationExpression;
+    }
+
+    /**
+     * f0 -> "new"
+     * f1 -> "boolean"
+     * f2 -> "["
+     * f3 -> Expression()
+     * f4 -> "]"
+     */
+    public Info visit(BooleanArrayAllocationExpression n, Info argu) {
+        System.out.println("BooleanArrayAllocationExpression starts");
+
+        String arraySize = null;
+        String okLabel, errorLabel;
+        String[] tempVariables;
+        FieldInfo expression;
+        VariableType variableType;
+
+        okLabel = "nsz_ok_" + arrayCounter;
+        errorLabel = "nsz_err_" + arrayCounter;
+
+        expression = (FieldInfo)n.f3.accept(this, null);
+
+        if(expression.getType().equals("identifier")) {
+            variableType = findLocation(expression);
+            expression = variableType.getVariable();
+
+            if(variableType.getType().equals("local")) {
+                // Loading the value that's stored in the expression
+                arraySize = getTempVariable();
+                writeOutput("\t" + arraySize + " = load i32, i32* " + expression.getRegName() + "\n");
+            }
+            else {
+                // Getting a pointer to the field
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (expression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " = bitcast i8* to i32*\n");
+
+                // Loading the value
+                arraySize = getTempVariable();
+                writeOutput("\t" + arraySize + " = load i32, i32* " + bitcast + "\n");
+            }
+        }
+        else if(expression.getType().equals("int"))
+            arraySize = expression.getName();
+
+        tempVariables = new String[4];
+        for(int i = 0; i < 4; i++)
+            tempVariables[i] = getTempVariable();
+
+        // Calculating arraySize bytes to be allocated for the array (new array[sz] -> add i32 1, sz
+        writeOutput("\t" + tempVariables[0] + " = add i32 1, " + arraySize + "\n");
+
+        // Checking the the size of the array is ≥ 1
+        writeOutput("\t" + tempVariables[1] + " = icmp sge i32 " + tempVariables[0] + ", 1\n");
+        writeOutput("\tbr i1 " + tempVariables[1] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
+
+        // If the size is negative, throw a negative size exception
+        writeOutput("\t" + errorLabel + ":\n");
+        writeOutput("\tcall void @throw_nsz()\n");
+        writeOutput("\tbr label %" + okLabel + "\n\n");
+
+        // Everything's okay. We can proceed to the allocation
+        writeOutput("\t" + okLabel + ":\n");
+
+        // Allocating (arraySize + 1) integers (1 byte each)
+        writeOutput("\t" + tempVariables[2] + " = call i8* @calloc(i32 " + tempVariables[0] + ", i32 1)\n");
+
+        // Casting the pointer that was returned
+        writeOutput("\t" + tempVariables[3] + " = bitcast i8* " + tempVariables[2] + " to i32*\n");
+
+        // Storing the size of the array in the first position
+        writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n\n");
+
+        System.out.println("BooleanArrayAllocationExpression ends");
+        return new FieldInfo("newBooleanArrayExpr", tempVariables[3], -1, false);
     }
 
     /**
@@ -1391,6 +1471,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         okLabel = "nsz_ok_" + arrayCounter;
         errorLabel = "nsz_err_" + arrayCounter;
+        arrayCounter++;
 
         expression = (FieldInfo)n.f3.accept(this, null);
 
@@ -1399,10 +1480,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
             expression = variableType.getVariable();
 
             if(variableType.getType().equals("local")) {
-
                 // Loading the value that's stored in the expression
                 arraySize = getTempVariable();
-                writeOutput("\t" + arraySize + " = load i32, i32* " + expression.getRegName() + "\n");
+                writeOutput("\t" + arraySize + " = load i32, i32* " + expression.getRegName() + "\n\n");
             }
             else {
                 // Getting a pointer to the field
@@ -1415,7 +1495,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
                 // Loading the value
                 arraySize = getTempVariable();
-                writeOutput("\t" + arraySize + " = load i32, i32* " + bitcast + "\n");
+                writeOutput("\t" + arraySize + " = load i32, i32* " + bitcast + "\n\n");
             }
 
         }
@@ -1430,11 +1510,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\t" + tempVariables[1] + " = icmp sge i32 " + tempVariables[0] + ", 1\n");
         writeOutput("\tbr i1 " + tempVariables[1] + ", label %" + okLabel + ", label %" + errorLabel + "\n\n");
 
-        writeOutput("\t" + errorLabel + ":\n");
+        writeOutput(errorLabel + ":\n");
         writeOutput("\tcall void @throw_nsz()\n");
         writeOutput("\tbr label %" + okLabel + "\n\n");
 
-        writeOutput("\t" + okLabel + ":\n");
+        writeOutput(okLabel + ":\n");
         writeOutput("\t" + tempVariables[2] + " = call i8* @calloc(i32 " + tempVariables[0] + ", i32 4)\n");
         writeOutput("\t" + tempVariables[3] + " = bitcast i8* " + tempVariables[2] + " to i32*\n");
         writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n\n");
