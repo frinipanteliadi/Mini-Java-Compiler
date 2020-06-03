@@ -1424,7 +1424,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         for(int i = 0; i < 4; i++)
             tempVariables[i] = getTempVariable();
 
-        // Calculating arraySize bytes to be allocated for the array (new array[sz] -> add i32 1, sz
+        // Calculating arraySize bytes to be allocated for the array (new array[sz] -> add i32 4, sz
         writeOutput("\t" + tempVariables[0] + " = add i32 4, " + arraySize + "\n");
 
         // Checking the the size of the array is ≥ 1
@@ -1449,7 +1449,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n");
 
         System.out.println("BooleanArrayAllocationExpression ends");
-        return new FieldInfo("newBooleanArrayExpr", tempVariables[2], -1, false);
+        return new FieldInfo("newBooleanArrayExpr", tempVariables[3], -1, false);
     }
 
     /**
