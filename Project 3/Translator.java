@@ -1434,6 +1434,15 @@ public class Translator extends GJDepthFirst<Info, Info> {
     }
 
     /**
+     * f0 -> "this"
+     */
+    public Info visit(ThisExpression n, Info argu) {
+        System.out.println("ThisExpression starts");
+        System.out.println("ThisExpression ends");
+        return new FieldInfo("this", "%this", -1, false);
+    }
+
+    /**
      * f0 -> "("
      * f1 -> Expression()
      * f2 -> ")"
