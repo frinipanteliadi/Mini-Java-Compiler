@@ -1305,7 +1305,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
             variableType = findLocation(primaryExpression);
             primaryExpression = variableType.getVariable();
 
-            if(variableType.getType().equals("local")) {
+            if (variableType.getType().equals("local")) {
 
                 // Load the object pointer
                 registerName[0] = getTempVariable();
@@ -1314,123 +1314,78 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Doing the required bitcasts so that we can access the v-table
                 registerName[1] = getTempVariable();
                 writeOutput("\t" + registerName[1] + " = bitcast i8* " + registerName[0] + " to i8***\n");
-
-                // Loading the v-table pointer
-                registerName[2] = getTempVariable();
-                writeOutput("\t" + registerName[2] + " = load i8**, i8*** " + registerName[1] + "\n");
-
-                // Getting the name of the method that's being called
-                methodName = ((FieldInfo)n.f2.accept(this, null)).getName();
-                calledMethod = symbolTable.getClass(primaryExpression.getType()).getClassMethod(methodName);
-                if(calledMethod == null) {
-                    System.out.print("Error: Method " + calledMethod + " doesn't exist in class " + primaryExpression.getType());
-                    System.out.println(" or any of its superclasses");
-                    System.exit(1);
-                }
-
-                index = calledMethod.getOffset()/8;
-
-                // Getting a pointer to the first entry of the v-table
-                registerName[3] = getTempVariable();
-                writeOutput("\t" + registerName[3] + " = getelementptr i8*, i8** " + registerName[2] + ", i32 " + index + "\n");
-
-                // Getting the actual function pointer
-                registerName[4] = getTempVariable();
-                writeOutput("\t" + registerName[4] + " = load i8*, i8** " + registerName[3] + "\n");
-
-                // Casting the function pointer from i8* to a function ptr type that matches its signature
-                registerName[5] = getTempVariable();
-                type = vTables.setType(calledMethod.getReturnType());
-                writeOutput("\t" + registerName[5] + " = bitcast i8* " + registerName[4] + " to " + type);
-                writeOutput(" (i8*");
-
-                for(int i = 0; i < calledMethod.getArguments().size(); i++) {
-                    writeOutput(", ");
-                    type = vTables.setType(calledMethod.getArguments().get(i).getType());
-                    writeOutput(type);
-                }
-                writeOutput(")*\n\n");
-
-                registerName[6] = getTempVariable();
-                type = vTables.setType(calledMethod.getReturnType());
-                writeOutput("\t" + registerName[6] + " = call " + type + " " + registerName[5] + "(i8* " + registerName[0]);
-
-                if(n.f4.present()) {
-                    n.f4.accept(this, null);
-
-                    for(int i = 0; i < methodArguments.size(); i++) {
-                        writeOutput(", ");
-                        writeOutput(vTables.setType(methodArguments.get(i).getType()) + " " + methodArguments.get(i).getName());
-                    }
-
-                    methodArguments.clear();
-                }
-
-                writeOutput(")\n\n");
-                result = registerName[6];
-                //messageSend = new FieldInfo("messageSend", registerName[6], -1, false);
             }
         }
         else if(primaryExpression.getType().equals("this")) {
+
+            thisExpr = true;
+
             // Doing the required bitcasts so that we can access the v-table
             registerName[1] = getTempVariable();
             writeOutput("\t" + registerName[1] + " = bitcast i8* %this to i8***\n");
-
-            // Loading the v-table pointer
-            registerName[2] = getTempVariable();
-            writeOutput("\t" + registerName[2] + " = load i8**, i8*** " + registerName[1] + "\n");
-
-            // Getting the name of the method that's being called
-            methodName = ((FieldInfo)n.f2.accept(this, null)).getName();
-            calledMethod = symbolTable.getClass(currentClass.getName()).getClassMethod(methodName);
-            if(calledMethod == null) {
-                System.out.print("Error: Method " + calledMethod + " doesn't exist in class " + primaryExpression.getType());
-                System.out.println(" or any of its superclasses");
-                System.exit(1);
-            }
-
-            index = calledMethod.getOffset()/8;
-
-            // Getting a pointer to the first entry of the v-table
-            registerName[3] = getTempVariable();
-            writeOutput("\t" + registerName[3] + " = getelementptr i8*, i8** " + registerName[2] + ", i32 " + index + "\n");
-
-            // Getting the actual function pointer
-            registerName[4] = getTempVariable();
-            writeOutput("\t" + registerName[4] + " = load i8*, i8** " + registerName[3] + "\n");
-
-            // Casting the function pointer from i8* to a function ptr type that matches its signature
-            registerName[5] = getTempVariable();
-            type = vTables.setType(calledMethod.getReturnType());
-            writeOutput("\t" + registerName[5] + " = bitcast i8* " + registerName[4] + " to " + type);
-            writeOutput(" (i8*");
-
-            for(int i = 0; i < calledMethod.getArguments().size(); i++) {
-                writeOutput(", ");
-                type = vTables.setType(calledMethod.getArguments().get(i).getType());
-                writeOutput(type);
-            }
-            writeOutput(")*\n\n");
-
-            registerName[6] = getTempVariable();
-            type = vTables.setType(calledMethod.getReturnType());
-            writeOutput("\t" + registerName[6] + " = call " + type + " " + registerName[5] + "(i8* %this");
-
-            if(n.f4.present()) {
-                n.f4.accept(this, null);
-
-                for(int i = 0; i < methodArguments.size(); i++) {
-                    writeOutput(", ");
-                    writeOutput(vTables.setType(methodArguments.get(i).getType()) + " " + methodArguments.get(i).getName());
-                }
-
-                methodArguments.clear();
-            }
-
-            writeOutput(")\n\n");
-            result = registerName[6];
-            //messageSend = new FieldInfo("messageSend", registerName[6], -1, false);
         }
+
+        // Loading the v-table pointer
+        registerName[2] = getTempVariable();
+        writeOutput("\t" + registerName[2] + " = load i8**, i8*** " + registerName[1] + "\n");
+
+        // Getting the name of the method that's being called
+        methodName = ((FieldInfo)n.f2.accept(this, null)).getName();
+        if(thisExpr)
+            calledMethod = symbolTable.getClass(currentClass.getName()).getClassMethod(methodName);
+        else
+            calledMethod = symbolTable.getClass(primaryExpression.getType()).getClassMethod(methodName);
+
+        if(calledMethod == null) {
+            System.out.print("Error: Method " + calledMethod + " doesn't exist in class " + primaryExpression.getType());
+            System.out.println(" or any of its superclasses");
+            System.exit(1);
+        }
+
+        index = calledMethod.getOffset()/8;
+
+        // Getting a pointer to the first entry of the v-table
+        registerName[3] = getTempVariable();
+        writeOutput("\t" + registerName[3] + " = getelementptr i8*, i8** " + registerName[2] + ", i32 " + index + "\n");
+
+        // Getting the actual function pointer
+        registerName[4] = getTempVariable();
+        writeOutput("\t" + registerName[4] + " = load i8*, i8** " + registerName[3] + "\n");
+
+        // Casting the function pointer from i8* to a function ptr type that matches its signature
+        registerName[5] = getTempVariable();
+        type = vTables.setType(calledMethod.getReturnType());
+        writeOutput("\t" + registerName[5] + " = bitcast i8* " + registerName[4] + " to " + type);
+        writeOutput(" (i8*");
+
+        for(int i = 0; i < calledMethod.getArguments().size(); i++) {
+            writeOutput(", ");
+            type = vTables.setType(calledMethod.getArguments().get(i).getType());
+            writeOutput(type);
+        }
+        writeOutput(")*\n\n");
+
+        registerName[6] = getTempVariable();
+        type = vTables.setType(calledMethod.getReturnType());
+
+        if(thisExpr)
+            writeOutput("\t" + registerName[6] + " = call " + type + " " + registerName[5] + "(i8* %this");
+        else
+            writeOutput("\t" + registerName[6] + " = call " + type + " " + registerName[5] + "(i8* " + registerName[0]);
+
+        if(n.f4.present()) {
+            n.f4.accept(this, null);
+
+            for(int i = 0; i < methodArguments.size(); i++) {
+                writeOutput(", ");
+                writeOutput(vTables.setType(methodArguments.get(i).getType()) + " " + methodArguments.get(i).getName());
+            }
+
+            methodArguments.clear();
+        }
+
+        writeOutput(")\n\n");
+        result = registerName[6];
 
         System.out.println("MessageSend ends");
         return /*messageSend*/new FieldInfo("messageSend", result, -1, false);
