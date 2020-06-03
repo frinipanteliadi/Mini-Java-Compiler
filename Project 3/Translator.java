@@ -1293,6 +1293,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         String[] registerName;
         String result = null;
         FieldInfo messageSend = null;
+        boolean thisExpr = false;
+        VariableType variableType = null;
 
         registerName = new String[7];
         primaryExpression = (FieldInfo)n.f0.accept(this, null);
@@ -1300,9 +1302,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
         if(primaryExpression.getType().equals("identifier")) {
             // The primary expression is an object of a class
 
-            if(currentMethod.variableNameExists(primaryExpression.getName())) {
-                //System.out.println("\tCase 1");
-                primaryExpression = currentMethod.getCertainVariable(primaryExpression.getName());
+            variableType = findLocation(primaryExpression);
+            primaryExpression = variableType.getVariable();
+
+            if(variableType.getType().equals("local")) {
 
                 // Load the object pointer
                 registerName[0] = getTempVariable();
