@@ -697,16 +697,33 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
             if(variableType.getType().equals("local")) {
 
+                type1 = vTables.setType(expression.getType());
+
                 // Loading the local variable
                 String ptr = getTempVariable();
-                writeOutput("\t" + ptr + " = load " + vTables.setType(expression.getType()));
-                writeOutput(", " + vTables.setType(expression.getType()) + "* ");
+                writeOutput("\t" + ptr + " = load " + type1);
+                writeOutput(", " + type1 + "* ");
                 writeOutput(expression.getRegName() + "\n");
 
-                type1 = vTables.setType(expression.getType());
                 arg1 = ptr;
             }
+            else {
+                type1 = vTables.setType(expression.getType());
 
+                // Getting a pointer to the field
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (expression.getOffset()+8) + "\n");
+
+                // Performing the necessary bitcasts
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to " + type1 + "*\n");
+
+                // Loading the value
+                String tempVar = getTempVariable();
+                writeOutput("\t" + tempVar + " = load " + type1 + ", " + type1 + "* " + bitcast + "\n");
+
+                arg1 = tempVar;
+            }
         }
         else if(expression.getType().equals("newIntArrayExpr")) {
             type1 = "i32*";
@@ -1305,7 +1322,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
             variableType = findLocation(primaryExpression);
             primaryExpression = variableType.getVariable();
 
-            if (variableType.getType().equals("local")) {
+            if(variableType.getType().equals("local")) {
 
                 // Load the object pointer
                 registerName[0] = getTempVariable();
