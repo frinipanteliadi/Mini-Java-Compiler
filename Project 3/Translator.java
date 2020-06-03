@@ -220,6 +220,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         String arrayAddr, arraySize;
         String index = null;
         String value = null;
+        String ptr = null;
+        boolean booleanArray = false;
         String[] tempVariables;
         FieldInfo identifier;
         FieldInfo firstExpression, secondExpression;
@@ -232,12 +234,26 @@ public class Translator extends GJDepthFirst<Info, Info> {
         variableType = findLocation(identifier);
         identifier = variableType.getVariable();
 
+        // Checking if we're working on a boolean array
+        if(identifier.getType().equals("boolean[]"))
+            booleanArray = true;
+
         // Loading the address of the array
-        arrayAddr = getTempVariable();
-        writeOutput("\t" + arrayAddr + " = load i32*, i32** " + identifier.getRegName() + "\n");
+        if(booleanArray) {
+            ptr = getTempVariable();
+            arraySize = getTempVariable();
+            arrayAddr = getTempVariable();
+
+            writeOutput("\t" + ptr + " = load i8*, i8** " + identifier.getRegName() + "\n");
+            writeOutput("\t" + arrayAddr + " = bitcast i8* " + ptr + " to i32*\n");
+        }
+        else {
+            arrayAddr = getTempVariable();
+            arraySize = getTempVariable();
+            writeOutput("\t" + arrayAddr + " = load i32*, i32** " + identifier.getRegName() + "\n");
+        }
 
         // Loading the size of the array
-        arraySize = getTempVariable();
         writeOutput("\t" + arraySize + " = load i32, i32* " + arrayAddr + "\n");
 
         firstExpression = (FieldInfo)n.f2.accept(this, null);
@@ -250,11 +266,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + index + " = load i32, i32* " + firstExpression.getRegName() + "\n");
             }
             else {
-                String ptr = getTempVariable();
-                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstExpression.getOffset() + 8) + "\n");
+                String pointer = getTempVariable();
+                writeOutput("\t" + pointer + " = getelementptr i8, i8* %this, i32 " + (firstExpression.getOffset() + 8) + "\n");
 
                 String bitcast = getTempVariable();
-                writeOutput("\t" + bitcast + " bitcast i8* " + ptr + " to i32*\n");
+                writeOutput("\t" + bitcast + " bitcast i8* " + pointer + " to i32*\n");
 
                 index = getTempVariable();
                 writeOutput("\t" + index + " = load i32, i32* " + bitcast + "\n");
@@ -295,11 +311,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + value + " = load i32, i32* " + firstExpression.getRegName() + "\n");
             }
             else {
-                String ptr = getTempVariable();
-                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstExpression.getOffset() + 8) + "\n");
+                String pointer = getTempVariable();
+                writeOutput("\t" + pointer + " = getelementptr i8, i8* %this, i32 " + (firstExpression.getOffset() + 8) + "\n");
 
                 String bitcast = getTempVariable();
-                writeOutput("\t" + bitcast + " bitcast i8* " + ptr + " to i32*\n");
+                writeOutput("\t" + bitcast + " bitcast i8* " + pointer + " to i32*\n");
 
                 value = getTempVariable();
                 writeOutput("\t" + value + " = load i32, i32* " + bitcast + "\n");
@@ -307,15 +323,34 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(secondExpression.getType().equals("int"))
             value = secondExpression.getName();
+        else if(secondExpression.getType().equals("true"))
+            value = "1";
+        else if(secondExpression.getType().equals("false"))
+            value = "0";
 
-        // Adding one to the index, since the first element holds the size
-        writeOutput("\t" + tempVariables[3] + " = add i32 1, " + index + "\n");
+        if(booleanArray) {
+            // Adding four to the index, since the first element holds the size
+            writeOutput("\t" + tempVariables[3] + " = add i32 4, " + index + "\n");
 
-        // Getting a pointer to the (i+1)th element of the array
-        writeOutput("\t" + tempVariables[4] + " = getelementptr i32, i32* " + arrayAddr + ", i32 " + tempVariables[3] + "\n");
+            String zext = getTempVariable();
+            writeOutput("\t" + zext + " = zext i1 " + value + " to i8\n");
 
-        // Store the value to that address
-        writeOutput("\tstore i32 " + value + ", i32* " + tempVariables[4] + "\n\n");
+            // Getting a pointer to the (i+1)th element of the array
+            writeOutput("\t" + tempVariables[4] + " = getelementptr i8, i8* " + ptr + ", i32 " + tempVariables[3] + "\n");
+
+            // Storing the value to that address
+            writeOutput("\tstore i8 " + zext + ", i8* " + tempVariables[4] + "\n\n");
+        }
+        else {
+            // Adding one to the index, since the first element holds the size
+            writeOutput("\t" + tempVariables[3] + " = add i32 1, " + index + "\n");
+
+            // Getting a pointer to the (i+1)th element of the array
+            writeOutput("\t" + tempVariables[4] + " = getelementptr i32, i32* " + arrayAddr + ", i32 " + tempVariables[3] + "\n");
+
+            // Store the value to that address
+            writeOutput("\tstore i32 " + value + ", i32* " + tempVariables[4] + "\n\n");
+        }
 
         System.out.println("ArrayAssignmentStatement ends");
         return null;
@@ -349,6 +384,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
             writeOutput("label %" + elseLabel + "\n\n");
         }
         else if(expression.getType().equals("andExpr")) {
+            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
+            writeOutput("label %" + elseLabel + "\n\n");
+        }
+        else if(expression.getType().equals("arrayLookUp")) {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
         }
@@ -522,10 +561,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + temp + " = bitcast i8* " + ptr + " to " + vTables.setType(returnStatement.getType()) + "*\n");
 
                 returnRegister = getTempVariable();
-                writeOutput("\t" + returnRegister + " load " + vTables.setType(returnStatement.getType()) + ", ");
+                writeOutput("\t" + returnRegister + " = load " + vTables.setType(returnStatement.getType()) + ", ");
                 writeOutput(vTables.setType(returnStatement.getType()) + "* " + temp + "\n\n");
 
-                type = returnStatement.getType();
+                type = vTables.setType(returnStatement.getType());
             }
             else if(currentMethod.getOwner().inheritedField(returnStatement.getName())) {
                 // Case 3: Field of a super class
@@ -680,12 +719,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
             type1 = "i8*";
             arg1 = expression.getName();
         }
-        else if(expression.getType().equals("boolean")) {
+        else if(expression.getType().equals("true")) {
             type1 = "i1";
-            if(expression.getName().equals("false"))
-                arg1 = "0";
-            else
-                arg1 = "1";
+            arg1 = "1";
+        }
+        else if(expression.getType().equals("false")) {
+            type1 = "i1";
+            arg1 = "0";
         }
         else{
             type1 = "i32";
@@ -753,6 +793,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         String registerName = null;
         String value = null;
         String type = null;
+        String ptr = null;
+        boolean booleanArray = false;
         FieldInfo firstPrimaryExpression;
         FieldInfo secondPrimaryExpression;
 
@@ -766,6 +808,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
         if(firstPrimaryExpression.getType().equals("identifier")) {
             variableType = findLocation(firstPrimaryExpression);
             firstPrimaryExpression = variableType.getVariable();
+
+            if(firstPrimaryExpression.getType().equals("boolean[]"))
+                booleanArray = true;
+
             type = firstPrimaryExpression.getType();
             if(type.equals("int[]"))
                 type = "int";
@@ -775,11 +821,22 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
 
         // Loading the address of the array
-        arrayAddr = getTempVariable();
-        writeOutput("\t" + arrayAddr + " = load i32*, i32** " + registerName + "\n");
+        if(booleanArray) {
+            ptr = getTempVariable();
+            arraySize = getTempVariable();
+            arrayAddr = getTempVariable();
+
+            writeOutput("\t" + ptr + " = load i8*, i8** " + firstPrimaryExpression.getRegName() + "\n");
+            writeOutput("\t" + arrayAddr + " = bitcast i8* " + ptr + " to i32*\n");
+        }
+        else {
+            arrayAddr = getTempVariable();
+            arraySize = getTempVariable();
+            writeOutput("\t" + arrayAddr + " = load i32*, i32** " + registerName + "\n");
+        }
 
         // Loading the size of the array
-        arraySize = getTempVariable();
+        //arraySize = getTempVariable();
         writeOutput("\t" + arraySize + " = load i32, i32* " + arrayAddr + "\n");
 
         if(secondPrimaryExpression.getType().equals("identifier")) {
@@ -791,11 +848,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + index + " = load i32, i32* " + secondPrimaryExpression.getRegName() + "\n");
             }
             else {
-                String ptr = getTempVariable();
-                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
+                String pointer = getTempVariable();
+                writeOutput("\t" + pointer + " = getelementptr i8, i8* %this, i32 " + (secondPrimaryExpression.getOffset()+8) + "\n");
 
                 String bitcast = getTempVariable();
-                writeOutput("\t" + bitcast + " bitcast i8* " + ptr + " to i32*\n");
+                writeOutput("\t" + bitcast + " bitcast i8* " + pointer + " to i32*\n");
 
                 index = getTempVariable();
                 writeOutput("\t" + index + " = load i32, i32* " + bitcast + "\n");
@@ -826,18 +883,34 @@ public class Translator extends GJDepthFirst<Info, Info> {
         // Everything's ok, moving on to indexing the array
         writeOutput(okLabel + ":\n");
 
-        // Adding one to the index, since the first element holds the size
-        writeOutput("\t" + tempVariables[3] + " = add i32 1, " + index + "\n");
+        if(booleanArray) {
+            // Adding four to the index, since the first element holds the size
+            writeOutput("\t" + tempVariables[3] + " = add i32 4, " + index + "\n");
 
-        // Getting a pointer to the (i+1)th element of the array
-        writeOutput("\t" + tempVariables[4] + " = getelementptr i32, i32* " + arrayAddr + ", i32 " + tempVariables[3] + "\n");
+            // Getting a pointer to the (i+1)th element of the array
+            writeOutput("\t" + tempVariables[4] + " = getelementptr i8, i8* " + ptr + ", i32 " + tempVariables[3] + "\n");
 
-        // Loading the value
-        value = getTempVariable();
-        writeOutput("\t" + value + " = load i32, i32* " + tempVariables[4] + "\n\n");
+            // Loading the value
+            String tempVar = getTempVariable();
+            writeOutput("\t" + tempVar + " = load i8, i8* " + tempVariables[4] + "\n");
+
+            value = getTempVariable();
+            writeOutput("\t" + value + " = trunc i8 " + tempVar + " to i1\n\n");
+        }
+        else {
+            // Adding one to the index, since the first element holds the size
+            writeOutput("\t" + tempVariables[3] + " = add i32 1, " + index + "\n");
+
+            // Getting a pointer to the (i+1)th element of the array
+            writeOutput("\t" + tempVariables[4] + " = getelementptr i32, i32* " + arrayAddr + ", i32 " + tempVariables[3] + "\n");
+
+            // Loading the value
+            value = getTempVariable();
+            writeOutput("\t" + value + " = load i32, i32* " + tempVariables[4] + "\n\n");
+        }
 
         System.out.println("ArrayLookup ends");
-        return new FieldInfo(/*"arrayLookUp"*/type, value, -1, false);
+        return new FieldInfo("arrayLookUp"/*type*/, value, -1, false);
     }
 
     /**
@@ -881,7 +954,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + addend_1 + " = load i32, i32* " + bitcast + "\n");
             }
         }
-        else if(firstPrimaryExpression.getType().equals("int"))
+        else/* if(firstPrimaryExpression.getType().equals("int"))
+            addend_1 = firstPrimaryExpression.getName();
+        else if(firstPrimaryExpression.getType().equals("arrayLookUp"))*/
             addend_1 = firstPrimaryExpression.getName();
 
         if(secondPrimaryExpression.getType().equals("identifier")) {
@@ -909,7 +984,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + addend_2 + " = load i32, i32* " + bitcast + "\n");
             }
         }
-        else if(secondPrimaryExpression.getType().equals("int"))
+        else/* if(secondPrimaryExpression.getType().equals("int"))
+            addend_2 = secondPrimaryExpression.getName();
+        else if(secondPrimaryExpression.getType().equals("arrayLookUp"))*/
             addend_2 = secondPrimaryExpression.getName();
 
         sum = getTempVariable();
@@ -959,7 +1036,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + minuend + " = load i32, i32* " + bitcast + "*\n");
             }
         }
-        else if(firstPrimaryExpression.getType().equals("int"))
+        else/* if(firstPrimaryExpression.getType().equals("int"))
+            minuend = firstPrimaryExpression.getName();
+        else if(firstPrimaryExpression.getType().equals("arrayLookUp"))*/
             minuend = firstPrimaryExpression.getName();
 
         if(secondPrimaryExpression.getType().equals("identifier")) {
@@ -985,7 +1064,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
             }
         }
-        else if(secondPrimaryExpression.getType().equals("int"))
+        else/* if(secondPrimaryExpression.getType().equals("int"))
+            subtrahend = secondPrimaryExpression.getName();
+        else if(secondPrimaryExpression.getType().equals("arrayLookUp"))*/
             subtrahend = secondPrimaryExpression.getName();
 
         difference = getTempVariable();
@@ -1149,12 +1230,12 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + factor_1 + " = load i32, i32* " + bitcast + "\n");
             }
         }
-        else if(firstPrimaryExpression.getType().equals("int"))
+        else/* if(firstPrimaryExpression.getType().equals("int"))
+            factor_1 = firstPrimaryExpression.getName();
+        else if(firstPrimaryExpression.getType().equals("arrayLookUp"))*/
             factor_1 = firstPrimaryExpression.getName();
 
-        if(secondPrimaryExpression.getType().equals("int"))
-            factor_2 = secondPrimaryExpression.getName();
-        else if(secondPrimaryExpression.getType().equals("identifier")) {
+        if(secondPrimaryExpression.getType().equals("identifier")) {
             variableType = findLocation(secondPrimaryExpression);
             secondPrimaryExpression = variableType.getVariable();
 
@@ -1178,6 +1259,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + factor_2 + " = load i32, i32* " + bitcast + "\n");
             }
         }
+        else/* if(secondPrimaryExpression.getType().equals("int"))
+            factor_2 = secondPrimaryExpression.getName();
+        else if(secondPrimaryExpression.getType().equals("arrayLookUp"))*/
+            factor_2 = secondPrimaryExpression.getName();
 
         product = getTempVariable();
 
@@ -1449,7 +1534,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n");
 
         System.out.println("BooleanArrayAllocationExpression ends");
-        return new FieldInfo("newBooleanArrayExpr", tempVariables[3], -1, false);
+
+        return new FieldInfo("newBooleanArrayExpr", tempVariables[2], -1, false);
     }
 
     /**
@@ -1531,7 +1617,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         String booleanValue = n.f0.toString();
 
         System.out.println("FalseLiteral ends");
-        return new FieldInfo("boolean", booleanValue, -1, false);
+        return new FieldInfo(/*"boolean"*/"false", booleanValue, -1, false);
     }
 
     /**
@@ -1543,7 +1629,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         String booleanValue = n.f0.toString();
 
         System.out.println("TrueLiteral ends");
-        return new FieldInfo("boolean", booleanValue, -1, false);
+        return new FieldInfo(/*"boolean"*/"true", booleanValue, -1, false);
     }
 
     /**
