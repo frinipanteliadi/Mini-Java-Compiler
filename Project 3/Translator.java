@@ -101,7 +101,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(MainClass n, Info argu) {
 
-        System.out.println("MainClass starts");
 
         String type;
         String registerName;
@@ -144,8 +143,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         currentMethod = null;
         registers = 0;
 
-        System.out.println("MainClass ends");
-
         return null;
     }
 
@@ -158,9 +155,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | PrintStatement()
      */
     public Info visit(Statement n, Info argu) {
-        System.out.println("Statement Starts");
         FieldInfo statement = (FieldInfo)n.f0.accept(this, null);
-        System.out.println("Statement ends");
         return statement;
     }
 
@@ -172,7 +167,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f4 -> Statement()
      */
     public Info visit(WhileStatement n, Info argu) {
-        System.out.println("WhileStatement starts");
 
         FieldInfo expression, statement;
         String condLabel, bodyLabel, exitLabel;
@@ -198,7 +192,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         // Ending the loop
         writeOutput(exitLabel + ":\n");
 
-        System.out.println("WhileStatement ends");
         return null;
     }
 
@@ -212,7 +205,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f6 -> ";"
      */
     public Info visit(ArrayAssignmentStatement n, Info argu) {
-        System.out.println("ArrayAssignmentStatement starts");
 
         VariableType variableType;
         String okLabel, errorLabel;
@@ -325,11 +317,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
             value = secondExpression.getName();
         else if(secondExpression.getType().equals("boolean"))
             value = secondExpression.getName();
-//        else if(secondExpression.getType().equals("true"))
-//            value = "1";
-//        else if(secondExpression.getType().equals("false"))
-//            value = "0";
-
 
         if(booleanArray) {
             // Adding four to the index, since the first element holds the size
@@ -355,7 +342,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
             writeOutput("\tstore i32 " + value + ", i32* " + tempVariables[4] + "\n\n");
         }
 
-        System.out.println("ArrayAssignmentStatement ends");
         return null;
     }
 
@@ -370,7 +356,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(IfStatement n, Info argu) {
 
-        System.out.println("IfStatement starts");
 
         FieldInfo expression;
         String ifLabel, elseLabel, endLabel;
@@ -386,18 +371,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
         }
-//        if(expression.getType().equals("compareExpr")) {
-//            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
-//            writeOutput("label %" + elseLabel + "\n\n");
-//        }
-//        else if(expression.getType().equals("andExpr")) {
-//            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
-//            writeOutput("label %" + elseLabel + "\n\n");
-//        }
-//        else if(expression.getType().equals("notExpr")) {
-//            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
-//            writeOutput("label %" + elseLabel + "\n\n");
-//        }
         else if(expression.getType().equals("arrayLookUp")) {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
@@ -413,7 +386,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         writeOutput(endLabel + ":\n");
 
-        System.out.println("IfStatement ends");
         return null;
     }
 
@@ -427,7 +399,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(ClassDeclaration n, Info argu) {
 
-        System.out.println("ClassDeclaration starts");
 
         String className;
         FieldInfo identifier;
@@ -443,7 +414,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         currentClass = null;
         currentMethod = null;
 
-        System.out.println("ClassDeclaration ends");
         return null;
     }
 
@@ -458,7 +428,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f7 -> "}"
      */
     public Info visit(ClassExtendsDeclaration n, Info argu) {
-        System.out.println("ClassExtendsDeclaration starts");
 
         String className;
         FieldInfo identifier;
@@ -473,7 +442,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         currentClass = null;
         currentMethod = null;
 
-        System.out.println("ClassExtendsDeclaration ends");
         return null;
     }
 
@@ -493,8 +461,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f12 -> "}"
      */
     public Info visit(MethodDeclaration n, Info argu) {
-
-        System.out.println("MethodDeclaration starts");
 
         String type = null;
         String regName;
@@ -605,12 +571,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(returnStatement.getType().equals("messageSend"))
             writeOutput("\n\tret i32 " + returnStatement.getName());
+        else
+            writeOutput("\n\tret i32 " + returnStatement.getName());
 
         currentMethod = null;
         registers = 0;
 
         writeOutput("\n}\n\n");
-        System.out.println("MethodDeclaration ends");
         return null;
     }
 
@@ -623,10 +590,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(PrintStatement n, Info argu) {
 
-        System.out.println("PrintStatement starts");
-
         FieldInfo expression;
-        String registerName;
+        String registerName = null;
         String type;
 
         expression = (FieldInfo)n.f2.accept(this, null);
@@ -643,7 +608,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 registerName = getTempVariable();
                 writeOutput("\t" + registerName + " = load " + type + ", " + type + "* " + expression.getRegName() + "\n");
 
-                writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
+                //writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
             }
             else if(currentMethod.getOwner().fieldNameExists(identifierName)) {
                 // Case 2: Field of the owning class
@@ -656,7 +621,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Performing the necessary bitcasts
                 registerName = getTempVariable();
                 writeOutput("\t" + registerName + " = bitcast i8* " + ptr + " to " + vTables.setType(expression.getType()) + "*\n");
-                writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
+                //writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
 
 
             }
@@ -671,16 +636,18 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 // Performing the necessary bitcasts
                 registerName = getTempVariable();
                 writeOutput("\t" + registerName + " = bitcast i8* " + ptr + " to " + vTables.setType(expression.getType()) + "*\n");
-                writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
+                //writeOutput("\tcall void(i32) @print_int(i32 " + registerName + ")\n");
             }
 
         }
-        else if(expression.getType().equals("messageSend") || expression.getType().equals("int") ||
+        else/* if(expression.getType().equals("messageSend") || expression.getType().equals("int") ||
                 expression.getType().equals("add") || expression.getType().equals("sub") ||
-                expression.getType().equals("mult"))
-            writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
+                expression.getType().equals("mult"))*/
+            registerName = expression.getName();
+            //writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
 
-        System.out.println("PrintStatement ends");
+        writeOutput("\tcall void (i32) @print_int(i32 " + registerName + ")\n");
+
         return expression;
     }
 
@@ -691,8 +658,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f3 -> ";"
      */
     public Info visit(AssignmentStatement n, Info argu) {
-
-        System.out.println("AssignmentStatement starts");
 
         FieldInfo identifier;
         FieldInfo expression;
@@ -740,22 +705,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
             type1 = "i32*";
             arg1 = expression.getName();
         }
-        else if(expression.getType().equals("newBooleanArrayExpr")) {
+        else if(expression.getType().equals("newBooleanArrayExpr") || expression.getType().equals("newExpression")) {
             type1 = "i8*";
             arg1 = expression.getName();
         }
-        else if(expression.getType().equals("newExpression")) {
-            type1 = "i8*";
-            arg1 = expression.getName();
-        }
-//        else if(expression.getType().equals("true")) {
-//            type1 = "i1";
-//            arg1 = "1";
-//        }
-//        else if(expression.getType().equals("false")) {
-//            type1 = "i1";
-//            arg1 = "0";
-//        }
         else if(expression.getType().equals("boolean")) {
             type1 = "i1";
             arg1 = expression.getName();
@@ -787,7 +740,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         writeOutput("\tstore " + type1 + " " + arg1 + ", " + type2 + " " + arg2 + "\n\n");
 
-        System.out.println("AssignmentStatement ends");
         return null;
     }
 
@@ -803,9 +755,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | Clause()
      */
     public Info visit(Expression n, Info argu) {
-        System.out.println("Expression starts");
         FieldInfo expression = (FieldInfo)n.f0.accept(this, null);
-        System.out.println("Expression ends");
         return expression;
     }
 
@@ -816,7 +766,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f3 -> "]"
      */
     public Info visit(ArrayLookup n, Info argu) {
-        System.out.println("ArrayLookup starts");
 
         VariableType variableType;
         String okLabel, errorLabel;
@@ -942,8 +891,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
             writeOutput("\t" + value + " = load i32, i32* " + tempVariables[4] + "\n\n");
         }
 
-        System.out.println("ArrayLookup ends");
-        return new FieldInfo("arrayLookUp"/*type*/, value, -1, false);
+        return new FieldInfo("arrayLookUp", value, -1, false);
     }
 
     /**
@@ -952,7 +900,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f2 -> PrimaryExpression()
      */
     public Info visit(PlusExpression n, Info argu) {
-        System.out.println("PlusExpression starts");
 
         VariableType variableType;
         FieldInfo firstPrimaryExpression;
@@ -987,9 +934,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + addend_1 + " = load i32, i32* " + bitcast + "\n");
             }
         }
-        else/* if(firstPrimaryExpression.getType().equals("int"))
-            addend_1 = firstPrimaryExpression.getName();
-        else if(firstPrimaryExpression.getType().equals("arrayLookUp"))*/
+        else
             addend_1 = firstPrimaryExpression.getName();
 
         if(secondPrimaryExpression.getType().equals("identifier")) {
@@ -1017,15 +962,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + addend_2 + " = load i32, i32* " + bitcast + "\n");
             }
         }
-        else/* if(secondPrimaryExpression.getType().equals("int"))
-            addend_2 = secondPrimaryExpression.getName();
-        else if(secondPrimaryExpression.getType().equals("arrayLookUp"))*/
+        else
             addend_2 = secondPrimaryExpression.getName();
 
         sum = getTempVariable();
         writeOutput("\t" + sum + " = add i32 " + addend_1 + ", " + addend_2 + "\n");
 
-        return new FieldInfo(/*"add"*/"int", sum, -1, false);
+        return new FieldInfo("int", sum, -1, false);
     }
 
     /**
@@ -1115,12 +1058,11 @@ public class Translator extends GJDepthFirst<Info, Info> {
      */
     public Info visit(AndExpression n, Info argu) {
 
-        System.out.println("AndExpression starts");
-
         String result;
         String left = null, right = null;
         String label_0, label_1, label_2, label_3;
         FieldInfo firstClause, secondClause;
+        VariableType variableType = null;
 
         firstClause = (FieldInfo)n.f0.accept(this, null);
 
@@ -1149,12 +1091,24 @@ public class Translator extends GJDepthFirst<Info, Info> {
         secondClause = (FieldInfo)n.f2.accept(this, null);
 
         if(secondClause.getType().equals("identifier")) {
-            if(currentMethod.variableNameExists(secondClause.getName())) {
-                // Case 1: Local variable of the method
-                secondClause = currentMethod.getCertainVariable(secondClause.getName());
 
+            variableType = findLocation(secondClause);
+            secondClause = variableType.getVariable();
+
+            if(variableType.getType().equals("local")) {
                 right = getTempVariable();
                 writeOutput("\t" + right + " = load i1, i1* " + secondClause.getRegName() + "\n\n");
+            }
+            else {
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondClause.getOffset()+8) + "\n");
+
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " = bitcast i8* to i1*\n");
+
+                // Loading the value
+                right = getTempVariable();
+                writeOutput("\t" + right + " = load i1, i1* " + bitcast + "\n");
             }
         }
 
@@ -1169,8 +1123,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\t" + result + " = phi i1 [0, %" + label_0 + "], ");
         writeOutput("[" + right + ", %" + label_2 + "]\n\n");
 
-        System.out.println("AndExpression end");
-        return new FieldInfo(/*"andExpr"*/"boolean", result, -1, false);
+        return new FieldInfo("boolean", result, -1, false);
     }
 
     /**
@@ -1179,8 +1132,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f2 -> PrimaryExpression()
      */
     public Info visit(CompareExpression n, Info argu) {
-
-        System.out.println("CompareExpression starts");
 
         String result;
         String left = null, right = null;
@@ -1219,8 +1170,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         writeOutput("\t" + result + " = icmp slt i32 " + left + ", " + right + "\n");
 
-        System.out.println("CompareExpression ends");
-        return new FieldInfo(/*"compareExpr"*/"boolean", result, -1, false);
+        return new FieldInfo("boolean", result, -1, false);
     }
 
     /**
@@ -1229,7 +1179,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f2 -> PrimaryExpression()
      */
     public Info visit(TimesExpression n, Info argu) {
-        System.out.println("TimesExpression starts");
 
         VariableType variableType;
         FieldInfo firstPrimaryExpression;
@@ -1263,9 +1212,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + factor_1 + " = load i32, i32* " + bitcast + "\n");
             }
         }
-        else/* if(firstPrimaryExpression.getType().equals("int"))
-            factor_1 = firstPrimaryExpression.getName();
-        else if(firstPrimaryExpression.getType().equals("arrayLookUp"))*/
+        else
             factor_1 = firstPrimaryExpression.getName();
 
         if(secondPrimaryExpression.getType().equals("identifier")) {
@@ -1292,17 +1239,14 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + factor_2 + " = load i32, i32* " + bitcast + "\n");
             }
         }
-        else/* if(secondPrimaryExpression.getType().equals("int"))
-            factor_2 = secondPrimaryExpression.getName();
-        else if(secondPrimaryExpression.getType().equals("arrayLookUp"))*/
+        else
             factor_2 = secondPrimaryExpression.getName();
 
         product = getTempVariable();
 
         writeOutput("\t" + product + " = mul i32 " + factor_1 + ", " + factor_2 + "\n\n");
 
-        System.out.println("TimesExpression ends");
-        return new FieldInfo(/*"mult"*/"int", product, -1, false);
+        return new FieldInfo("int", product, -1, false);
     }
 
     /**
@@ -1314,8 +1258,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f5 -> ")"
      */
     public Info visit(MessageSend n, Info argu) {
-
-        System.out.println("MessageSend starts");
 
         int index;
         String type;
@@ -1419,8 +1361,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput(")\n\n");
         result = registerName[6];
 
-        System.out.println("MessageSend ends");
-        return /*messageSend*/new FieldInfo("messageSend", result, -1, false);
+        return new FieldInfo("messageSend", result, -1, false);
     }
 
     /**
@@ -1428,8 +1369,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f1 -> ExpressionTail()
      */
     public Info visit(ExpressionList n, Info argu) {
-
-        System.out.println("ExpressionList starts");
 
         FieldInfo expression;
         FieldInfo expressionTail;
@@ -1442,7 +1381,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
             /* do nothing */
         }
 
-        System.out.println("ExpressionList ends");
         return null;
     }
 
@@ -1450,11 +1388,9 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f0 -> ( ExpressionTerm() )*
      */
     public Info visit(ExpressionTail n, Info argu) {
-        System.out.println("ExpressionTerm starts");
         FieldInfo expressionTerm = null;
         if(n.f0.present())
             expressionTerm = (FieldInfo)n.f0.accept(this, null);
-        System.out.println("ExpressionTerm ends");
         return expressionTerm;
     }
 
@@ -1463,9 +1399,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | PrimaryExpression()
      */
     public Info visit(Clause n, Info argu) {
-        System.out.println("Clause starts");
         FieldInfo clause = (FieldInfo)n.f0.accept(this, null);
-        System.out.println("Clause ends");
         return clause;
     }
 
@@ -1475,7 +1409,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f1 -> Clause()
      */
     public Info visit(NotExpression n, Info argu) {
-        System.out.println("NotExpression starts");
 
         FieldInfo clause;
         String register;
@@ -1485,8 +1418,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         writeOutput("\t" + register + " = xor i1 1, " + clause.getName());
 
-        System.out.println("NotExpression ends");
-        return new FieldInfo(/*"notExpr"*/"boolean", register, -1, false);
+        return new FieldInfo("boolean", register, -1, false);
     }
 
     /**
@@ -1500,9 +1432,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | BracketExpression()
      */
     public Info visit(PrimaryExpression n, Info argu) {
-        System.out.println("PrimaryExpression starts");
         FieldInfo primaryExpression = (FieldInfo) n.f0.accept(this, null);
-        System.out.println("PrimaryExpression ends");
         return primaryExpression;
     }
 
@@ -1510,8 +1440,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f0 -> "this"
      */
     public Info visit(ThisExpression n, Info argu) {
-        System.out.println("ThisExpression starts");
-        System.out.println("ThisExpression ends");
         return new FieldInfo("this", "%this", -1, false);
     }
 
@@ -1521,11 +1449,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f2 -> ")"
      */
     public Info visit(BracketExpression n, Info argu) {
-        System.out.println("BracketExpression starts");
 
         FieldInfo expression = (FieldInfo)n.f1.accept(this, null);
-
-        System.out.println("BracketExpression ends");
         return expression;
     }
 
@@ -1534,9 +1459,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
      *       | IntegerArrayAllocationExpression()
      */
     public Info visit(ArrayAllocationExpression n, Info argu) {
-        System.out.println("ArrayAllocationExpression starts");
         FieldInfo arrayAllocationExpression = (FieldInfo)n.f0.accept(this, null);
-        System.out.println("ArrayAllocationExpression ends");
         return arrayAllocationExpression;
     }
 
@@ -1548,7 +1471,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f4 -> "]"
      */
     public Info visit(BooleanArrayAllocationExpression n, Info argu) {
-        System.out.println("BooleanArrayAllocationExpression starts");
 
         String arraySize = null;
         String okLabel, errorLabel;
@@ -1586,6 +1508,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(expression.getType().equals("int"))
             arraySize = expression.getName();
+        else
+            arraySize = expression.getName();
 
         tempVariables = new String[4];
         for(int i = 0; i < 4; i++)
@@ -1615,8 +1539,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         // Storing the size of the array in the first position
         writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n");
 
-        System.out.println("BooleanArrayAllocationExpression ends");
-
         return new FieldInfo("newBooleanArrayExpr", tempVariables[2], -1, false);
     }
 
@@ -1628,7 +1550,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f4 -> "]"
      */
     public Info visit(IntegerArrayAllocationExpression n, Info argu) {
-        System.out.println("IntegerArrayAllocationExpression starts");
 
         String arraySize = null;
         String okLabel, errorLabel;
@@ -1668,6 +1589,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(expression.getType().equals("int"))
             arraySize = expression.getName();
+        else
+            arraySize = expression.getName();
 
         tempVariables = new String[4];
         for(int i = 0; i < 4; i++)
@@ -1686,7 +1609,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\t" + tempVariables[3] + " = bitcast i8* " + tempVariables[2] + " to i32*\n");
         writeOutput("\tstore i32 " + arraySize + ", i32* " + tempVariables[3] + "\n\n");
 
-        System.out.println("IntegerArrayAllocationExpression ends");
         return new FieldInfo("newIntArrayExpr", tempVariables[3], -1, false);
     }
 
@@ -1694,24 +1616,20 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f0 -> "false"
      */
     public Info visit(FalseLiteral n, Info argu) {
-        System.out.println("FalseLiteral starts");
 
         String booleanValue = n.f0.toString();
 
-        System.out.println("FalseLiteral ends");
-        return new FieldInfo("boolean"/*"false"*/, /*booleanValue*/"0", -1, false);
+        return new FieldInfo("boolean", "0", -1, false);
     }
 
     /**
      * f0 -> "true"
      */
     public Info visit(TrueLiteral n, Info argu) {
-        System.out.println("TrueLiteral starts");
 
         String booleanValue = n.f0.toString();
 
-        System.out.println("TrueLiteral ends");
-        return new FieldInfo(/*"true"*/"boolean", /*booleanValue*/"1", -1, false);
+        return new FieldInfo("boolean", "1", -1, false);
     }
 
     /**
@@ -1721,8 +1639,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f3 -> ")"
      */
     public Info visit(AllocationExpression n, Info argu) {
-
-        System.out.println("AllocationExpression starts");
 
         int size;
         int pointersTableSize;
@@ -1750,7 +1666,6 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         writeOutput("\tstore i8** " + registerName[2] + ", i8*** " + registerName[1] + "\n");
 
-        System.out.println("AllocationExpression ends");
         return (new FieldInfo("newExpression", registerName[0], -1, false));
     }
 
@@ -1758,13 +1673,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f0 -> <INTEGER_LITERAL>
      */
     public Info visit(IntegerLiteral n, Info argu) {
-
-        System.out.println("IntegerLiteral starts");
         String intValue;
-
         intValue = n.f0.toString();
-
-        System.out.println("IntegerLiteral ends");
         return (new FieldInfo("int", intValue, -1, false));
     }
 
@@ -1772,13 +1682,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
      * f0 -> <IDENTIFIER>
      */
     public Info visit(Identifier n, Info argu) {
-
-        System.out.println("Identifier starts");
-
         String identifierName;
         identifierName = n.f0.toString();
-
-        System.out.println("Identifier ends");
         return new FieldInfo("identifier", identifierName, -1, false);
     }
 }
