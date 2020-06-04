@@ -375,6 +375,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
         }
+        else {
+            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
+            writeOutput("label %" + elseLabel + "\n\n");
+        }
 
         writeOutput(elseLabel + ":\n");
         n.f6.accept(this, null);
@@ -757,6 +761,52 @@ public class Translator extends GJDepthFirst<Info, Info> {
     public Info visit(Expression n, Info argu) {
         FieldInfo expression = (FieldInfo)n.f0.accept(this, null);
         return expression;
+    }
+
+    /**
+     * f0 -> PrimaryExpression()
+     * f1 -> "."
+     * f2 -> "length"
+     */
+    public Info visit(ArrayLength n, Info argu) {
+
+
+        FieldInfo primaryExpression;
+        String sizeReg = null;
+        VariableType variableType = null;
+        boolean booleanArray = false;
+        String ptr = null, arrayAddr = null, arraySize = null;
+        String registerName = null;
+
+        primaryExpression = (FieldInfo)n.f0.accept(this, null);
+
+        variableType = findLocation(primaryExpression);
+        primaryExpression = variableType.getVariable();
+
+        registerName = primaryExpression.getRegName();
+
+        if(primaryExpression.getType().equals("boolean[]"))
+            booleanArray = true;
+
+        // Loading the address of the array
+        if(booleanArray) {
+            ptr = getTempVariable();
+            arraySize = getTempVariable();
+            arrayAddr = getTempVariable();
+
+            writeOutput("\t" + ptr + " = load i8*, i8** " + primaryExpression.getRegName() + "\n");
+            writeOutput("\t" + arrayAddr + " = bitcast i8* " + ptr + " to i32*\n");
+        }
+        else {
+            arrayAddr = getTempVariable();
+            arraySize = getTempVariable();
+            writeOutput("\t" + arrayAddr + " = load i32*, i32** " + registerName + "\n");
+        }
+
+        // Loading the size of the array
+        writeOutput("\t" + arraySize + " = load i32, i32* " + arrayAddr + "\n");
+
+        return new FieldInfo("int", arraySize, -1, false);
     }
 
     /**
