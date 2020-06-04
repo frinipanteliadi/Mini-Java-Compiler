@@ -387,6 +387,10 @@ public class Translator extends GJDepthFirst<Info, Info> {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
         }
+        else if(expression.getType().equals("notExpr")) {
+            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
+            writeOutput("label %" + elseLabel + "\n\n");
+        }
         else if(expression.getType().equals("arrayLookUp")) {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
@@ -1452,6 +1456,26 @@ public class Translator extends GJDepthFirst<Info, Info> {
         FieldInfo clause = (FieldInfo)n.f0.accept(this, null);
         System.out.println("Clause ends");
         return clause;
+    }
+
+    /**
+     * Grammar production:
+     * f0 -> "!"
+     * f1 -> Clause()
+     */
+    public Info visit(NotExpression n, Info argu) {
+        System.out.println("NotExpression starts");
+
+        FieldInfo clause;
+        String register;
+
+        clause = (FieldInfo)n.f1.accept(this, null);
+        register = getTempVariable();
+
+        writeOutput("\t" + register + " = xor i1 1, " + clause.getName());
+
+        System.out.println("NotExpression ends");
+        return new FieldInfo("notExpr", register, -1, false);
     }
 
     /**
