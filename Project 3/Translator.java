@@ -323,10 +323,13 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(secondExpression.getType().equals("int"))
             value = secondExpression.getName();
-        else if(secondExpression.getType().equals("true"))
-            value = "1";
-        else if(secondExpression.getType().equals("false"))
-            value = "0";
+        else if(secondExpression.getType().equals("boolean"))
+            value = secondExpression.getName();
+//        else if(secondExpression.getType().equals("true"))
+//            value = "1";
+//        else if(secondExpression.getType().equals("false"))
+//            value = "0";
+
 
         if(booleanArray) {
             // Adding four to the index, since the first element holds the size
@@ -379,18 +382,22 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         expression = (FieldInfo)n.f2.accept(this, null);
 
-        if(expression.getType().equals("compareExpr")) {
+        if(expression.getType().equals("boolean")) {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
         }
-        else if(expression.getType().equals("andExpr")) {
-            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
-            writeOutput("label %" + elseLabel + "\n\n");
-        }
-        else if(expression.getType().equals("notExpr")) {
-            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
-            writeOutput("label %" + elseLabel + "\n\n");
-        }
+//        if(expression.getType().equals("compareExpr")) {
+//            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
+//            writeOutput("label %" + elseLabel + "\n\n");
+//        }
+//        else if(expression.getType().equals("andExpr")) {
+//            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
+//            writeOutput("label %" + elseLabel + "\n\n");
+//        }
+//        else if(expression.getType().equals("notExpr")) {
+//            writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
+//            writeOutput("label %" + elseLabel + "\n\n");
+//        }
         else if(expression.getType().equals("arrayLookUp")) {
             writeOutput("\tbr i1 " + expression.getName() + ", label %" + ifLabel + ", ");
             writeOutput("label %" + elseLabel + "\n\n");
@@ -741,13 +748,17 @@ public class Translator extends GJDepthFirst<Info, Info> {
             type1 = "i8*";
             arg1 = expression.getName();
         }
-        else if(expression.getType().equals("true")) {
+//        else if(expression.getType().equals("true")) {
+//            type1 = "i1";
+//            arg1 = "1";
+//        }
+//        else if(expression.getType().equals("false")) {
+//            type1 = "i1";
+//            arg1 = "0";
+//        }
+        else if(expression.getType().equals("boolean")) {
             type1 = "i1";
-            arg1 = "1";
-        }
-        else if(expression.getType().equals("false")) {
-            type1 = "i1";
-            arg1 = "0";
+            arg1 = expression.getName();
         }
         else{
             type1 = "i32";
@@ -1159,7 +1170,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("[" + right + ", %" + label_2 + "]\n\n");
 
         System.out.println("AndExpression end");
-        return new FieldInfo("andExpr", result, -1, false);
+        return new FieldInfo(/*"andExpr"*/"boolean", result, -1, false);
     }
 
     /**
@@ -1209,7 +1220,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\t" + result + " = icmp slt i32 " + left + ", " + right + "\n");
 
         System.out.println("CompareExpression ends");
-        return new FieldInfo("compareExpr", result, -1, false);
+        return new FieldInfo(/*"compareExpr"*/"boolean", result, -1, false);
     }
 
     /**
@@ -1475,7 +1486,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         writeOutput("\t" + register + " = xor i1 1, " + clause.getName());
 
         System.out.println("NotExpression ends");
-        return new FieldInfo("notExpr", register, -1, false);
+        return new FieldInfo(/*"notExpr"*/"boolean", register, -1, false);
     }
 
     /**
@@ -1688,7 +1699,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         String booleanValue = n.f0.toString();
 
         System.out.println("FalseLiteral ends");
-        return new FieldInfo(/*"boolean"*/"false", booleanValue, -1, false);
+        return new FieldInfo("boolean"/*"false"*/, /*booleanValue*/"0", -1, false);
     }
 
     /**
@@ -1700,7 +1711,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
         String booleanValue = n.f0.toString();
 
         System.out.println("TrueLiteral ends");
-        return new FieldInfo(/*"boolean"*/"true", booleanValue, -1, false);
+        return new FieldInfo(/*"true"*/"boolean", /*booleanValue*/"1", -1, false);
     }
 
     /**
