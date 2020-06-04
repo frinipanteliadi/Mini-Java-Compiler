@@ -243,7 +243,7 @@ public class ClassInfo extends Info {
 
         // Setting the register names for the fields of the class
         for(int i = 0; i < fields.size(); i++)
-            fields.get(i).setRegName(this.getName() + "_" + fields.get(i).getName());
+            fields.get(i).setRegName("%" + this.getName() + "_" + fields.get(i).getName());
 
         // Setting the register names for the local variables
         for(int i = 0; i < methods.size(); i++)
