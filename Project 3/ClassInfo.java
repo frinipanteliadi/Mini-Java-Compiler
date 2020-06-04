@@ -189,7 +189,15 @@ public class ClassInfo extends Info {
     }
 
     public MethodInfo getClassMethod(String methodName) {
-        return methodMap.get(methodName);
+
+        MethodInfo classMethod = null;
+
+        if(methodMap.containsKey(methodName))
+            classMethod = methodMap.get(methodName);
+        else if(inheritedMethodMap.containsKey(methodName))
+            classMethod = inheritedMethodMap.get(methodName);
+
+        return /*methodMap.get(methodName)*/classMethod;
     }
 
     /* Methods for printing */
