@@ -270,6 +270,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(firstExpression.getType().equals("int"))
             index = firstExpression.getName();
+        else
+            index = firstExpression.getName();
 
         tempVariables = new String[5];
         for(int i = 0; i < 5; i++)
@@ -316,6 +318,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         else if(secondExpression.getType().equals("int"))
             value = secondExpression.getName();
         else if(secondExpression.getType().equals("boolean"))
+            value = secondExpression.getName();
+        else
             value = secondExpression.getName();
 
         if(booleanArray) {
@@ -644,11 +648,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
             }
 
         }
-        else/* if(expression.getType().equals("messageSend") || expression.getType().equals("int") ||
-                expression.getType().equals("add") || expression.getType().equals("sub") ||
-                expression.getType().equals("mult"))*/
+        else
             registerName = expression.getName();
-            //writeOutput("\tcall void (i32) @print_int(i32 " + expression.getName() + ")\n");
 
         writeOutput("\tcall void (i32) @print_int(i32 " + registerName + ")\n");
 
@@ -892,6 +893,8 @@ public class Translator extends GJDepthFirst<Info, Info> {
         }
         else if(secondPrimaryExpression.getType().equals("int"))
             index = secondPrimaryExpression.getName();
+        else
+            index = secondPrimaryExpression.getName();
 
         tempVariables = new String[5];
         for(int i = 0; i < 5; i++)
@@ -1062,9 +1065,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + minuend + " = load i32, i32* " + bitcast + "*\n");
             }
         }
-        else/* if(firstPrimaryExpression.getType().equals("int"))
-            minuend = firstPrimaryExpression.getName();
-        else if(firstPrimaryExpression.getType().equals("arrayLookUp"))*/
+        else
             minuend = firstPrimaryExpression.getName();
 
         if(secondPrimaryExpression.getType().equals("identifier")) {
@@ -1090,9 +1091,7 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + subtrahend + " = load i32, i32* " + bitcast + "*\n");
             }
         }
-        else/* if(secondPrimaryExpression.getType().equals("int"))
-            subtrahend = secondPrimaryExpression.getName();
-        else if(secondPrimaryExpression.getType().equals("arrayLookUp"))*/
+        else
             subtrahend = secondPrimaryExpression.getName();
 
         difference = getTempVariable();
@@ -1118,14 +1117,26 @@ public class Translator extends GJDepthFirst<Info, Info> {
 
         if(firstClause.getType().equals("identifier")) {
 
-            if(currentMethod.variableNameExists(firstClause.getName())) {
-                // Case 1: Local variable of the method
-                firstClause = currentMethod.getCertainVariable(firstClause.getName());
+            variableType = findLocation(firstClause);
+            firstClause = variableType.getVariable();
 
+            if(variableType.getType().equals("local")) {
                 left = getTempVariable();
                 writeOutput("\t" + left + " = load i1, i1* " + firstClause.getRegName() + "\n");
             }
+            else {
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstClause.getOffset()+8) + "\n");
+
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to i1*\n");
+
+                left = getTempVariable();
+                writeOutput("\t" + left + " = load i1, i1* " + bitcast + "\n");
+            }
         }
+        else
+            left = firstClause.getName();
 
         label_0 = "exp_res_" + labelCounter++;
         label_1 = "exp_res_" + labelCounter++;
@@ -1154,13 +1165,15 @@ public class Translator extends GJDepthFirst<Info, Info> {
                 writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (secondClause.getOffset()+8) + "\n");
 
                 String bitcast = getTempVariable();
-                writeOutput("\t" + bitcast + " = bitcast i8* to i1*\n");
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to i1*\n");
 
                 // Loading the value
                 right = getTempVariable();
                 writeOutput("\t" + right + " = load i1, i1* " + bitcast + "\n");
             }
         }
+        else
+            right = secondClause.getName();
 
         writeOutput("\tbr label %" + label_2 + "\n\n");
 
@@ -1186,34 +1199,61 @@ public class Translator extends GJDepthFirst<Info, Info> {
         String result;
         String left = null, right = null;
         FieldInfo firstPrimaryExpression, secondPrimaryExpression;
+        VariableType variableType;
 
         firstPrimaryExpression = (FieldInfo)n.f0.accept(this, null);
         secondPrimaryExpression = (FieldInfo)n.f2.accept(this, null);
 
         if(firstPrimaryExpression.getType().equals("identifier")) {
+
+            variableType = findLocation(firstPrimaryExpression);
+            firstPrimaryExpression = variableType.getVariable();
+
             // ** Locating the identifier **
-            if(currentMethod.variableNameExists(firstPrimaryExpression.getName())) {
-                // Case 1: Local variable of the method
-                firstPrimaryExpression = currentMethod.getCertainVariable(firstPrimaryExpression.getName());
-
+            if(variableType.getType().equals("local")) {
                 left = getTempVariable();
-
                 writeOutput("\t" + left + " = load " + vTables.setType(firstPrimaryExpression.getType()));
                 writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
                 writeOutput(firstPrimaryExpression.getRegName() + "\n");
 
             }
-            else if(currentMethod.getOwner().fieldNameExists(firstPrimaryExpression.getName())) {
-                // Case 2: Field of the owning method
-                firstPrimaryExpression = currentMethod.getOwner().getCertainField(firstPrimaryExpression.getName());
-            }
-            else if(currentMethod.getOwner().inheritedField(firstPrimaryExpression.getName())) {
-                // Case 3: Field of a super class
-                firstPrimaryExpression = currentMethod.getOwner().getInheritedField(firstPrimaryExpression.getName());
+            else {
+                String ptr = getTempVariable();
+                writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
+
+                String bitcast = getTempVariable();
+                writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to i1*\n");
+
+                left = getTempVariable();
+                writeOutput("\t" + left + " = load i1, i1* " + bitcast + "\n");
             }
         }
+        else
+            left = firstPrimaryExpression.getName();
 
-        if(secondPrimaryExpression.getType().equals("int"))
+
+        if(secondPrimaryExpression.getType().equals("identifier")) {
+           variableType = findLocation(secondPrimaryExpression);
+           secondPrimaryExpression = variableType.getVariable();
+
+           if(variableType.equals("local")) {
+               right = getTempVariable();
+               writeOutput("\t" + right + " = load " + vTables.setType(firstPrimaryExpression.getType()));
+               writeOutput(", " + vTables.setType(firstPrimaryExpression.getType()) + "* ");
+               writeOutput(firstPrimaryExpression.getRegName() + "\n");
+           }
+           else {
+               String ptr = getTempVariable();
+               writeOutput("\t" + ptr + " = getelementptr i8, i8* %this, i32 " + (firstPrimaryExpression.getOffset()+8) + "\n");
+
+               String bitcast = getTempVariable();
+               writeOutput("\t" + bitcast + " = bitcast i8* " + ptr + " to i1*\n");
+
+               right = getTempVariable();
+               writeOutput("\t" + right + " = load i1, i1* " + bitcast + "\n");
+           }
+        }
+        else
             right = secondPrimaryExpression.getName();
 
         result = getTempVariable();
