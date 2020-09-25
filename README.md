@@ -20,15 +20,15 @@ Its operation includes the following stages:
 
 The compiler uses a symbol table for the purpose of keeping track of information for the different entities found within the source code. Specifically,
 
-- for the **classes** it records their name as well as both the fields and methods they contain,
-- for the **methods** it records their variables (local and arguments),
-- for the **variables** it records their type and whether they've been initialized or not.
+- regarding the **classes**, it records their name as well as both the fields and methods they contain,
+- regarding the **methods**, it records their variables (local and arguments),
+- regarding the **variables**, it records their type and whether they've been initialized or not.
 
-Throughout this process the program is examined for:
+Afterwards, the source code is [type checked](https://en.wikipedia.org/wiki/Type_system#Type_checking). 
 
-1. Duplicate classes 
+If at least one of MiniJava's rules is being broken, the compilation process terminates and a message, that describes the error, is displayed. 
 
-
+### Intermediate Code Generation
 
 
 
