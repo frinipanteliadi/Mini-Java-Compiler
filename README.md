@@ -89,17 +89,19 @@ We can run each one of the projects that represent the final compiler separately
 
 ##   Can I see it? 📸
 
+### Example of a successful Semantic Analysis (Project 2)
+
 ![Project2-Example](https://github.com/frinipanteliadi/Mini-Java-Compiler/blob/master/Images/Project2-Example.png)
 
-[^]: Image 1: Example of a successful Semantic Analysis (Project 2)
+### Example of an unsuccessful Semantic Analysis (Project 2)
 
 ![Project2-ErrorExample](https://github.com/frinipanteliadi/Mini-Java-Compiler/blob/master/Images/Project2-ErrorExample.png)
 
-[^]: Image 2: Example of an unsuccessful Semantic Analysis (Project 2)
+### Example of generating and executing code in the LLVM assembly language (Project 3)
 
 ![Project3-Example(Part 1)](https://github.com/frinipanteliadi/Mini-Java-Compiler/blob/master/Images/Project3-Example(Part%201).png)
 
 ![Project 3-Example(Part 2)](https://github.com/frinipanteliadi/Mini-Java-Compiler/blob/master/Images/Project%203-Example(Part%202).png)
 
-[^]: Images 3 & 4: Example of generating and executing code in the LLVM assembly language
+
 
