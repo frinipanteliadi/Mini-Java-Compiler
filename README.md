@@ -47,7 +47,7 @@ We can run each one of the projects that represent the final compiler separately
 - for **Project 2**, which covers the Semantic Analysis phase, we simply type the following on the command line prompt:
 
   ```bash
-  make clean -C Project\ 2
+  make -C Project\ 2
   ```
 
   ```bash
