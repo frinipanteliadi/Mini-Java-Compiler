@@ -89,17 +89,17 @@ We can run each one of the projects that represent the final compiler separately
 
 ##   Can I see it? 📸
 
-![Project2-Example](/Users/frinipanteliadi/Desktop/Project2-Example.png)
+![Project2-Example](/Users/frinipanteliadi/Desktop/K31-Compilers/Images/Project2-Example.png)
 
 [^]: Image 1: Example of a successful Semantic Analysis (Project 2)
 
-![Project2-ErrorExample](/Users/frinipanteliadi/Desktop/Project2-ErrorExample.png)
+![Project2-ErrorExample](/Users/frinipanteliadi/Desktop/K31-Compilers/Images/Project2-ErrorExample.png)
 
 [^]: Image 2: Example of an unsuccessful Semantic Analysis (Project 2)
 
-![Project3-Example(Part 1)](/Users/frinipanteliadi/Desktop/Project3-Example(Part 1).png)
+![Project3-Example(Part 1)](/Users/frinipanteliadi/Desktop/K31-Compilers/Images/Project3-Example(Part 1).png)
 
-![Project 3-Example(Part 2)](/Users/frinipanteliadi/Desktop/Project 3-Example(Part 2).png)
+![Project 3-Example(Part 2)](/Users/frinipanteliadi/Desktop/K31-Compilers/Images/Project 3-Example(Part 2).png)
 
 [^]: Images 3 & 4: Example of generating and executing code in the LLVM assembly language
 
