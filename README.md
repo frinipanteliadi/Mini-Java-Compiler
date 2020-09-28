@@ -99,7 +99,7 @@ We can run each one of the projects that represent the final compiler separately
 
 ![Project3-Example(Part 1)](https://github.com/frinipanteliadi/Mini-Java-Compiler/blob/master/Images/Project3-Example(Part%201).png)
 
-![Project 3-Example(Part 2)](/Users/frinipanteliadi/Desktop/K31-Compilers/Images/Project 3-Example(Part 2).png)
+![Project 3-Example(Part 2)](https://github.com/frinipanteliadi/Mini-Java-Compiler/blob/master/Images/Project%203-Example(Part%202).png)
 
 [^]: Images 3 & 4: Example of generating and executing code in the LLVM assembly language
 
