@@ -51,10 +51,10 @@ We can run each one of the projects that represent the final compiler separately
   ```
 
   ```bash
-  java Main <source_code.txt>
+  java Main <source_code>.txt
   ```
 
-  *<source_code.txt>* is a .txt file that holds the MiniJava code we wish to use. 
+  *<source_code>.txt* is a .txt file that holds the MiniJava code we wish to use. 
 
   If no errors have been found, information about the source file's classes will be displayed on the screen. Otherwise, a message explaining what the first error was and where it was found will appear.  
 
@@ -64,7 +64,7 @@ We can run each one of the projects that represent the final compiler separately
   make -C Project\ 3
   ```
 
-  ```
+  ```bash
   java Main <input_file>.java
   ```
 
@@ -87,7 +87,19 @@ We can run each one of the projects that represent the final compiler separately
   make clean -C Project\ 3
   ```
 
-   
-
 ##   Can I see it? 📸
+
+![Project2-Example](/Users/frinipanteliadi/Desktop/Project2-Example.png)
+
+[^]: Image 1: Example of a successful Semantic Analysis (Project 2)
+
+![Project2-ErrorExample](/Users/frinipanteliadi/Desktop/Project2-ErrorExample.png)
+
+[^]: Image 2: Example of an unsuccessful Semantic Analysis (Project 2)
+
+![Project3-Example(Part 1)](/Users/frinipanteliadi/Desktop/Project3-Example(Part 1).png)
+
+![Project 3-Example(Part 2)](/Users/frinipanteliadi/Desktop/Project 3-Example(Part 2).png)
+
+[^]: Images 3 & 4: Example of generating and executing code in the LLVM assembly language
 
